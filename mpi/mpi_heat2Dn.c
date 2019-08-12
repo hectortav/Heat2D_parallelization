@@ -69,7 +69,7 @@ MPI_Status status;
       /************************* master code *******************************/
       /* Check if numworkers is within range - quit if not */
       if ((numworkers > MAXWORKER) || (numworkers < MINWORKER)) {
-         printf("ERROR: the number of tasks must be between %d and %d.(%d)\n",
+         printfemail("ERROR: the number of tasks must be between %d and %d.(%d)\n",
                  MINWORKER+1, MAXWORKER+1, numworkers);
          printf("Quitting...\n");
          MPI_Abort(MPI_COMM_WORLD, rc);
