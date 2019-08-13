@@ -231,6 +231,16 @@ MPI_Request left_r, right_r, up_r, down_r;
          }
          /* Now call update to update the value of grid points */
          update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
+
+         if (left != NONE)
+            MPI_Wait(&left_r, MPI_STATUS_IGNORE);
+         if (right != NONE)
+            MPI_Wait(&right_r, MPI_STATUS_IGNORE);
+         if (up != NONE)
+            MPI_Wait(&up_r, MPI_STATUS_IGNORE);
+         if (down != NONE)
+            MPI_Wait(&down_r, MPI_STATUS_IGNORE);
+
          iz = 1 - iz;
       }
 
