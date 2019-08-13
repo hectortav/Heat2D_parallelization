@@ -25,6 +25,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define NXPROB      20                 /* x dimension of problem grid */
 #define NYPROB      20                 /* y dimension of problem grid */
@@ -65,6 +66,8 @@ MPI_Status status;
 //new vars
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
+MPI_Request left_r, right_r, up_r, down_r;
+
 
 
 /* First, find out my taskid and how many tasks are running */
@@ -109,12 +112,23 @@ int start_h, end_h, start_v, end_v;
             right = NONE;
          else
             right = i + 1;
+         
+         if (i - (int)sqrt(numworkers) < 0)
+            up = NONE;
+         else
+            up = i - (int)sqrt(numworkers);
+         if (i + (int)sqrt(numworkers) > numworkers)
+            down = NONE;
+         else
+            down = i + (int)sqrt(numworkers);
          /*  Now send startup information to each worker  */
          dest = i;
          MPI_Send(&offset, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&rows, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&left, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&right, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
+         MPI_Send(&up, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
+         MPI_Send(&down, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, dest, BEGIN,
                   MPI_COMM_WORLD);
          printf("Sent to task %d: rows= %d offset= %d ",dest,rows,offset);
@@ -158,20 +172,10 @@ int start_h, end_h, start_v, end_v;
       MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&left, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&right, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
+      MPI_Recv(&up, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
+      MPI_Recv(&down, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source, msgtype,
                MPI_COMM_WORLD, &status);
-
-      /*
-      start_h = 1;
-      start_v = 1;
-      end_h = BLOCK_SIZE;
-      end_v = BLOCK_SIZE;
-      if (taskid <= (int)sqrt(numworkers))
-      {
-         start_h++;
-         up = -1;
-      }
-      */
 
       /* Determine border elements.  Need to consider first and last columns. */
       /* Obviously, row 0 can't exchange with row 0-1.  Likewise, the last */
@@ -195,36 +199,36 @@ int start_h, end_h, start_v, end_v;
          //if up exists then send to X and receive from X
          if (left != NONE)
          {
-            printf("left\n");
-            MPI_Send(&u[iz][1][1], NYPROB, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD);
+            //printf("left\n");
+            MPI_Isend(&u[iz][1][1], NYPROB, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &left_r);
             source = left;
             msgtype = LTAG;
-            MPI_Recv(&u[iz][1][0], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &status);
+            MPI_Irecv(&u[iz][1][0], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &left_r);
          }
          if (right != NONE)
          {
-            printf("right\n");
-            MPI_Send(&u[iz][1][BLOCK_SIZE], NYPROB, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD);
+            //printf("right\n");
+            MPI_Isend(&u[iz][1][BLOCK_SIZE], NYPROB, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &right_r);
             source = right;
             msgtype = RTAG;
-            MPI_Recv(&u[iz][1][BLOCK_SIZE + 1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &status);
+            MPI_Irecv(&u[iz][1][BLOCK_SIZE + 1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &right_r);
          }
-         /*if (up != NONE)
+         if (up != NONE)
          {
-            printf("up\n");
-            MPI_Send(&u[iz][1][1], NYPROB, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD);
+            //printf("up\n");
+            MPI_Isend(&u[iz][1][1], NYPROB, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &up_r);
             source = up;
             msgtype = UTAG;
-            MPI_Recv(&u[iz][0][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &status);
+            MPI_Irecv(&u[iz][0][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &up_r);
          }
          if (down != NONE)
          {
-            printf("down\n");
-            MPI_Send(&u[iz][BLOCK_SIZE][1], NYPROB, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD);
+            //printf("down\n");
+            MPI_Isend(&u[iz][BLOCK_SIZE][1], NYPROB, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &down_r);
             source = down;
             msgtype = DTAG;
-            MPI_Recv(&u[iz][BLOCK_SIZE + 1][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &status);
-         }*/
+            MPI_Irecv(&u[iz][BLOCK_SIZE + 1][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
+         }
          /* Now call update to update the value of grid points */
          update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
          iz = 1 - iz;
