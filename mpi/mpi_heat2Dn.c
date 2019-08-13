@@ -28,7 +28,7 @@
 
 #define NXPROB      20                 /* x dimension of problem grid */
 #define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
+#define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -52,11 +52,13 @@ int	taskid,                     /* this task's unique id */
 	numtasks,                   /* number of tasks */
 	averow,rows,offset,extra,   /* for sending rows of data */
 	dest, source,               /* to - from for message send-receive */
-	left,right,        /* neighbor tasks */
 	msgtype,                    /* for message types */
 	rc,start,end,               /* misc */
 	i,ix,iy,iz,it;              /* loop variables */
 MPI_Status status;
+
+//new vars
+int left, right, up, down;       /* neighbor tasks */
 
 
 /* First, find out my taskid and how many tasks are running */
@@ -69,7 +71,7 @@ MPI_Status status;
       /************************* master code *******************************/
       /* Check if numworkers is within range - quit if not */
       if ((numworkers > MAXWORKER) || (numworkers < MINWORKER)) {
-         printfemail("ERROR: the number of tasks must be between %d and %d.(%d)\n",
+         printf("ERROR: the number of tasks must be between %d and %d.(%d)\n",
                  MINWORKER+1, MAXWORKER+1, numworkers);
          printf("Quitting...\n");
          MPI_Abort(MPI_COMM_WORLD, rc);
@@ -134,8 +136,6 @@ MPI_Status status;
       MPI_Finalize();
    }   /* End of master code */
 
-
-
    /************************* workers code **********************************/
    if (taskid != MASTER)
    {
@@ -173,7 +173,8 @@ MPI_Status status;
       printf("Task %d received work. Beginning time steps...\n",taskid);
       iz = 0;
       for (it = 1; it <= STEPS; it++)
-      {
+      {  
+         //if up exists then send to X and receive from X
          if (left != NONE)
          {
             MPI_Send(&u[iz][offset][0], NYPROB, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD);
