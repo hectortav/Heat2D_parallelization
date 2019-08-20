@@ -1,27 +1,3 @@
-/****************************************************************************
- * FILE: mpi_heat2D.c
- * DESCRIPTIONS:
- *   HEAT2D Example - Parallelized C Version
- *   This example is based on a simplified two-dimensional heat
- *   equation domain decomposition.  The initial temperature is computed to be
- *   high in the middle of the domain and zero at the boundaries.  The
- *   boundaries are held at zero throughout the simulation.  During the
- *   time-stepping, an array containing two domains is used; these domains
- *   alternate between old data and new data.
- *
- *   In this parallelized version, the grid is decomposed by the master
- *   process and then distributed by rows to the worker processes.  At each
- *   time step, worker processes must exchange border data with neighbors,
- *   because a grid point's current temperature depends upon it's previous
- *   time step value plus the values of the neighboring grid points.  Upon
- *   completion of all time steps, the worker processes return their results
- *   to the master process.
- *
- *   Two data files are produced: an initial data set and a final data set.
- * AUTHOR: Blaise Barney - adapted from D. Turner's serial C version. Converted
- *   to MPI: George L. Gusciora (1/95)
- * LAST REVISED: 04/02/05
- ****************************************************************************/
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +25,8 @@ struct Parms {
   float cy;
 } parms = {0.1, 0.1};
 
-int main (int argc, char *argv[])
-{
+int main (int argc, char *argv[]){
+
 void inidat(), prtdat(), update();
 float  u[2][NXPROB][NYPROB];        /* array for grid */
 int	taskid,                     /* this task's unique id */
@@ -112,7 +88,7 @@ MPI_Request left_r, right_r, up_r, down_r;
             right = NONE;
          else
             right = i + 1;
-         
+
          if (i - (int)sqrt(numworkers) < 0)
             up = NONE;
          else
@@ -195,7 +171,7 @@ MPI_Request left_r, right_r, up_r, down_r;
       printf("Task %d received work. Beginning time steps...\n",taskid);
       iz = 0;
       for (it = 1; it <= STEPS; it++)
-      {  
+      {
          //if up exists then send to X and receive from X
          if (left != NONE)
          {
@@ -250,8 +226,9 @@ MPI_Request left_r, right_r, up_r, down_r;
       MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE,
                MPI_COMM_WORLD);
       MPI_Finalize();
-   }
+   } /* End of workers code */
 }
+
 
 
 /**************************************************************************
