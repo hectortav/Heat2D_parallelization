@@ -3,18 +3,16 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define NXPROB      20                 /* x dimension of problem grid */
-#define NYPROB      20                 /* y dimension of problem grid */
 #define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
-#define NONE        0                  /* indicates no neighbor */
+#define NONE        -1                  /* indicates no neighbor */
 #define DONE        4                  /* message tag */
 #define MASTER      0                  /* taskid of first process */
 
 //New Params
-#define BLOCK_SIZE 10
+#define BLOCK 100
 #define LTAG        2                  /* message tag */
 #define RTAG        3                  /* message tag */
 #define UTAG        5                  /* message tag */
@@ -28,7 +26,7 @@ struct Parms {
 int main (int argc, char *argv[]){
 
 void inidat(), prtdat(), update();
-float  u[2][NXPROB][NYPROB];        /* array for grid */
+float  u[2][BLOCK][BLOCK];        /* array for grid */
 int	taskid,                     /* this task's unique id */
 	numworkers,                 /* number of worker processes */
 	numtasks,                   /* number of tasks */
@@ -44,131 +42,57 @@ int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
 MPI_Request left_r, right_r, up_r, down_r;
 
-
+int row=0;
+double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
 
 /* First, find out my taskid and how many tasks are running */
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
-   numworkers = numtasks-1;
-
-   if (taskid == MASTER) {
-      /************************* master code *******************************/
-      /* Check if numworkers is within range - quit if not */
-      if ((numworkers > MAXWORKER) || (numworkers < MINWORKER)) {
-         printf("ERROR: the number of tasks must be between %d and %d.(%d)\n",
-                 MINWORKER+1, MAXWORKER+1, numworkers);
-         printf("Quitting...\n");
-         MPI_Abort(MPI_COMM_WORLD, rc);
-         exit(1);
-         }
-      printf ("Starting mpi_heat2D with %d worker tasks.\n", numworkers);
-
-      /* Initialize grid */
-      printf("Grid size: X= %d  Y= %d  Time steps= %d\n",NXPROB,NYPROB,STEPS);
-      printf("Initializing grid and writing initial.dat file...\n");
-      inidat(NXPROB, NYPROB, u);
-      prtdat(NXPROB, NYPROB, u, "initial.dat");
-
-      /* Distribute work to workers.  Must first figure out how many rows to */
-      /* send and what to do with extra rows.  */
-      averow = NXPROB/numworkers;
-      extra = NXPROB%numworkers;
-      offset = 0;
-      for (i=1; i<=numworkers; i++)
-      {
-         rows = (i <= extra) ? averow+1 : averow;
-         /* Tell each worker who its neighbors are, since they must exchange */
-         /* data with each other. */
-         if (i == 1)
-            left = NONE;
-         else
-            left = i - 1;
-         if (i == numworkers)
-            right = NONE;
-         else
-            right = i + 1;
-
-         if (i - (int)sqrt(numworkers) < 0)
-            up = NONE;
-         else
-            up = i - (int)sqrt(numworkers);
-         if (i + (int)sqrt(numworkers) > numworkers)
-            down = NONE;
-         else
-            down = i + (int)sqrt(numworkers);
-         /*  Now send startup information to each worker  */
-         dest = i;
-         MPI_Send(&offset, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&rows, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&left, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&right, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&up, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&down, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, dest, BEGIN,
-                  MPI_COMM_WORLD);
-         printf("Sent to task %d: rows= %d offset= %d ",dest,rows,offset);
-         printf("left= %d right= %d\n",left,right);
-         offset = offset + rows;
-      }
-      /* Now wait for results from all worker tasks */
-      for (i=1; i<=numworkers; i++)
-      {
-         source = i;
-         msgtype = DONE;
-         MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD,
-                  &status);
-         MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-         MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source,
-                  msgtype, MPI_COMM_WORLD, &status);
-      }
-
-      /* Write final output, call X graph and finalize MPI */
-      printf("Writing final.dat file and generating graph...\n");
-      prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
-      printf("Click on MORE button to view initial/final states.\n");
-      printf("Click on EXIT button to quit program.\n");
-
-      MPI_Finalize();
-   }   /* End of master code */
-
-   /************************* workers code **********************************/
-   if (taskid != MASTER)
-   {
+   if(sqrt(numtasks)!=floor(sqrt(numtasks))){
+      printf("We must have an equal number of blocks(ex 3x3,4x4)\n");
+      MPI_Abort(MPI_COMM_WORLD,rc);
+      exit(1);
+   }
       /* Initialize everything - including the borders - to zero */
       for (iz=0; iz<2; iz++)
-         for (ix=0; ix<NXPROB; ix++)
-            for (iy=0; iy<NYPROB; iy++)
+         for (ix=0; ix<BLOCK; ix++)
+            for (iy=0; iy<BLOCK; iy++)
                u[iz][ix][iy] = 0.0;
+      /* Initialize block to random values */
+      inidat(BLOCK,BLOCK,u[0]);
 
-      /* Receive my offset, rows, neighbors and grid partition from master */
-      source = MASTER;
-      msgtype = BEGIN;
-      MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&left, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&right, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&up, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&down, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source, msgtype,
-               MPI_COMM_WORLD, &status);
+      /* Calculate neighboors */
+      row=(int)sqrt(numtasks);
 
-      /* Determine border elements.  Need to consider first and last columns. */
-      /* Obviously, row 0 can't exchange with row 0-1.  Likewise, the last */
-      /* row can't exchange with last+1.  */
-      if (offset==0)
-         start=1;
+      /* up */
+      if(taskid<row)
+        up=NONE;
       else
-         start=offset;
-      if ((offset+rows)==NXPROB)
-         end=start+rows-2;
-      else
-         end = start+rows-1;
+        up=taskid-row;
 
-      /* Begin doing STEPS iterations.  Must communicate border rows with */
-      /* neighbors.  If I have the first or last grid row, then I only need */
-      /*  to  communicate with one neighbor  */
-      printf("Task %d received work. Beginning time steps...\n",taskid);
+      /* down */
+      if(taskid>=(numtasks-row))
+        down=NONE;
+      else
+        down=taskid+row;
+
+      /* left */
+      if((taskid%row)==0)
+        left=NONE;
+      else
+        left=taskid-1;
+
+      /* right */
+      if((taskid%row)==(row-1))
+        right=NONE;
+      else
+        right=taskid+1;
+
+      printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
+
+      start_time=MPI_Wtime();
+      /* for loop */
       iz = 0;
       for (it = 1; it <= STEPS; it++)
       {
@@ -176,37 +100,37 @@ MPI_Request left_r, right_r, up_r, down_r;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][1][1], NYPROB, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &left_r);
+            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &left_r);
             source = left;
             msgtype = LTAG;
-            MPI_Irecv(&u[iz][1][0], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &left_r);
+            MPI_Irecv(&u[iz][1][0], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &left_r);
          }
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][1][BLOCK_SIZE], NYPROB, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &right_r);
+            MPI_Isend(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &right_r);
             source = right;
             msgtype = RTAG;
-            MPI_Irecv(&u[iz][1][BLOCK_SIZE + 1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &right_r);
+            MPI_Irecv(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &right_r);
          }
          if (up != NONE)
          {
             //printf("up\n");
-            MPI_Isend(&u[iz][1][1], NYPROB, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &up_r);
+            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &up_r);
             source = up;
             msgtype = UTAG;
-            MPI_Irecv(&u[iz][0][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &up_r);
+            MPI_Irecv(&u[iz][0][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &up_r);
          }
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK_SIZE][1], NYPROB, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &down_r);
+            MPI_Isend(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &down_r);
             source = down;
             msgtype = DTAG;
-            MPI_Irecv(&u[iz][BLOCK_SIZE + 1][1], NYPROB, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
+            MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
          }
          /* Now call update to update the value of grid points */
-         update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
+         update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
 
          if (left != NONE)
             MPI_Wait(&left_r, MPI_STATUS_IGNORE);
@@ -219,14 +143,9 @@ MPI_Request left_r, right_r, up_r, down_r;
 
          iz = 1 - iz;
       }
-
-      /* Finally, send my portion of final results back to master */
-      MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-      MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-      MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE,
-               MPI_COMM_WORLD);
+      end_time=MPI_Wtime();
+      task_time=start_time-end_time;
       MPI_Finalize();
-   } /* End of workers code */
 }
 
 
