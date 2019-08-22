@@ -26,7 +26,7 @@ struct Parms {
 int main (int argc, char *argv[]){
 
 void inidat(), prtdat(), update();
-float  u[2][BLOCK][BLOCK];        /* array for grid */
+float  ***u;        /* array for grid */
 int	taskid,                     /* this task's unique id */
 	numworkers,                 /* number of worker processes */
 	numtasks,                   /* number of tasks */
@@ -34,13 +34,14 @@ int	taskid,                     /* this task's unique id */
 	dest, source,               /* to - from for message send-receive */
 	msgtype,                    /* for message types */
 	rc,start,end,               /* misc */
-	i,ix,iy,iz,it;              /* loop variables */
+	i,ix,iy,iz,it,j;              /* loop variables */
 MPI_Status status;
 
 //new vars
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
 MPI_Request left_r, right_r, up_r, down_r;
+MPI_Datatype MPI_row,MPI_column;
 
 int row=0;
 double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
@@ -54,43 +55,77 @@ double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
       MPI_Abort(MPI_COMM_WORLD,rc);
       exit(1);
    }
+      /* allocate memory for block */
+      u=(float***)malloc(2*sizeof(float**));
+      for(i=0;i<2;i++){
+        u[i]=(float**)malloc((BLOCK+2)*sizeof(float*));
+        for(j=0;j<(BLOCK+2);j++){
+          u[i][j]=(float*)malloc((BLOCK+2)*sizeof(float));
+        }
+      }
       /* Initialize everything - including the borders - to zero */
       for (iz=0; iz<2; iz++)
-         for (ix=0; ix<BLOCK; ix++)
-            for (iy=0; iy<BLOCK; iy++)
+         for (ix=0; ix<BLOCK+2; ix++)
+            for (iy=0; iy<BLOCK+2; iy++)
                u[iz][ix][iy] = 0.0;
       /* Initialize block to random values */
-      inidat(BLOCK,BLOCK,u[0]);
+      inidat(BLOCK+2,BLOCK+2,u[0]);
 
       /* Calculate neighboors */
       row=(int)sqrt(numtasks);
 
       /* up */
-      if(taskid<row)
+      if(taskid<row){
+        start_h=2;
         up=NONE;
-      else
+      }
+      else{
+        start_h=1;
         up=taskid-row;
+      }
 
       /* down */
-      if(taskid>=(numtasks-row))
+      if(taskid>=(numtasks-row)){
+        end_h=BLOCK-1;
         down=NONE;
-      else
+      }
+      else{
+        end_h=BLOCK;
         down=taskid+row;
+      }
 
       /* left */
-      if((taskid%row)==0)
+      if((taskid%row)==0){
+        start_v=2;
         left=NONE;
-      else
+      }
+      else{
+        start_v=1;
         left=taskid-1;
+      }
 
       /* right */
-      if((taskid%row)==(row-1))
+      if((taskid%row)==(row-1)){
+        end_v=BLOCK-1;
         right=NONE;
-      else
+      }
+      else{
+        end_v=BLOCK;
         right=taskid+1;
+      }
 
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
 
+      MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_column);
+      MPI_Type_commit(&MPI_column);
+      MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_row);
+      MPI_Type_commit(&MPI_row);
+      // REMOVE THIS WHEN YOU ARE DONE WITH THE loop
+      /* -----
+      */
+      MPI_Finalize();
+      /* -----
+      */
       start_time=MPI_Wtime();
       /* for loop */
       iz = 0;
@@ -129,7 +164,7 @@ double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
             msgtype = DTAG;
             MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
          }
-         /* Now call update to update the value of grid points */
+
          update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
 
          if (left != NONE)
@@ -145,6 +180,16 @@ double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
       }
       end_time=MPI_Wtime();
       task_time=start_time-end_time;
+      /* free data */
+      MPI_Type_free(&MPI_column);
+      MPI_Type_free(&MPI_row);
+      for(i=0;i<BLOCK+2;i++){
+        free(u[0][i]);
+        free(u[1][i]);
+      }
+      free(u[0]);
+      free(u[1]);
+      free(u);
       MPI_Finalize();
 }
 
@@ -170,12 +215,11 @@ void update(int start, int end, int ny, float *u1, float *u2)
 /*****************************************************************************
  *  subroutine inidat
  *****************************************************************************/
-void inidat(int nx, int ny, float *u) {
+void inidat(int nx, int ny, float **u) {
 int ix, iy;
-
-for (ix = 0; ix <= nx-1; ix++)
-  for (iy = 0; iy <= ny-1; iy++)
-     *(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+for (ix = 0; ix < nx; ix++)
+  for (iy = 0; iy < ny; iy++)
+     u[ix][iy] = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
 }
 
 /**************************************************************************
