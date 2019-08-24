@@ -25,7 +25,7 @@ struct Parms {
 
 int main (int argc, char *argv[]){
 
-void inidat(), prtdat(), update();
+void inidat(), prtdat(), update(), update_hv(), firstAndLast();
 float  ***u;        /* array for grid */
 int	taskid,                     /* this task's unique id */
 	numworkers,                 /* number of worker processes */
@@ -45,6 +45,7 @@ MPI_Datatype MPI_row,MPI_column;
 
 int row=0;
 double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
+int checkboard = BLOCK;
 
 /* First, find out my taskid and how many tasks are running */
    MPI_Init(&argc,&argv);
@@ -165,16 +166,29 @@ double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
             MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
          }
 
-         update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
+        //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
+        checkboard = BLOCK + 2;
+        update_hv(start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
 
-         if (left != NONE)
-            MPI_Wait(&left_r, MPI_STATUS_IGNORE);
-         if (right != NONE)
-            MPI_Wait(&right_r, MPI_STATUS_IGNORE);
-         if (up != NONE)
-            MPI_Wait(&up_r, MPI_STATUS_IGNORE);
-         if (down != NONE)
-            MPI_Wait(&down_r, MPI_STATUS_IGNORE);
+        if (left != NONE)
+          MPI_Wait(&left_r, MPI_STATUS_IGNORE);
+        if (right != NONE)
+          MPI_Wait(&right_r, MPI_STATUS_IGNORE);
+        if (up != NONE)
+          MPI_Wait(&up_r, MPI_STATUS_IGNORE);
+        if (down != NONE)
+          MPI_Wait(&down_r, MPI_STATUS_IGNORE);
+
+        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
+        
+        if (left != NONE)
+          MPI_Wait(&left_r, MPI_STATUS_IGNORE);
+        if (right != NONE)
+          MPI_Wait(&right_r, MPI_STATUS_IGNORE);
+        if (up != NONE)
+          MPI_Wait(&up_r, MPI_STATUS_IGNORE);
+        if (down != NONE)
+          MPI_Wait(&down_r, MPI_STATUS_IGNORE);
 
          iz = 1 - iz;
       }
@@ -210,6 +224,32 @@ void update(int start, int end, int ny, float *u1, float *u2)
                           parms.cy * (*(u1+ix*ny+iy+1) +
                          *(u1+ix*ny+iy-1) -
                           2.0 * *(u1+ix*ny+iy));
+}
+
+/**************************************************************************
+ *  subroutine update for both orientations
+ ****************************************************************************/
+void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float *u1, float *u2)
+{
+   int ix, iy;
+   for (ix = start_h; ix <= end_h; ix++)
+      for (iy = start_v; iy <= end_v; iy++)
+         *(u2+ix*ny+iy) = *(u1+ix*ny+iy)  +
+                          parms.cx * (*(u1+(ix+1)*ny+iy) +
+                          *(u1+(ix-1)*ny+iy) -
+                          2.0 * *(u1+ix*ny+iy)) +
+                          parms.cy * (*(u1+ix*ny+iy+1) +
+                         *(u1+ix*ny+iy-1) -
+                          2.0 * *(u1+ix*ny+iy));
+}
+
+/*calculate first and last rows and columns*/
+void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v, int ny, float *u1, float *u2)
+{
+  update_hv(start_h + 1, start_v, end_h - 1, start_v, checkboard, u1, u2);
+  update_hv(start_h + 1, end_v, end_h - 1, end_v, checkboard, u1, u2);
+  update_hv(start_h, start_v, start_h, end_v, checkboard, u1, u2);
+  update_hv(end_h, start_v, end_h, end_v, checkboard, u1, u2);
 }
 
 /*****************************************************************************
