@@ -40,7 +40,8 @@ MPI_Status status;
 //new vars
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
-MPI_Request left_r, right_r, up_r, down_r;
+MPI_Request Sleft_r, Sright_r, Sup_r, Sdown_r;  //send
+MPI_Request Rleft_r, Rright_r, Rup_r, Rdown_r;  //receive
 MPI_Datatype MPI_row,MPI_column;
 
 int row=0;
@@ -124,7 +125,9 @@ int checkboard = BLOCK;
       // REMOVE THIS WHEN YOU ARE DONE WITH THE loop
       /* -----
       */
-      MPI_Finalize();
+      //???????????????????????????????
+      //if (taskid == MASTER)
+        MPI_Finalize();
       /* -----
       */
       start_time=MPI_Wtime();
@@ -136,34 +139,34 @@ int checkboard = BLOCK;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &left_r);
+            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
-            MPI_Irecv(&u[iz][1][0], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &left_r);
+            MPI_Irecv(&u[iz][1][0], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
          }
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &right_r);
+            MPI_Isend(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
-            MPI_Irecv(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &right_r);
+            MPI_Irecv(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rright_r);
          }
          if (up != NONE)
          {
             //printf("up\n");
-            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &up_r);
+            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
-            MPI_Irecv(&u[iz][0][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &up_r);
+            MPI_Irecv(&u[iz][0][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rup_r);
          }
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &down_r);
+            MPI_Isend(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
             source = down;
             msgtype = DTAG;
-            MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &down_r);
+            MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
          }
 
         //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
@@ -171,24 +174,24 @@ int checkboard = BLOCK;
         update_hv(start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
 
         if (left != NONE)
-          MPI_Wait(&left_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Rleft_r, MPI_STATUS_IGNORE);
         if (right != NONE)
-          MPI_Wait(&right_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Rright_r, MPI_STATUS_IGNORE);
         if (up != NONE)
-          MPI_Wait(&up_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Rup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
-          MPI_Wait(&down_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
 
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
         
         if (left != NONE)
-          MPI_Wait(&left_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
         if (right != NONE)
-          MPI_Wait(&right_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
         if (up != NONE)
-          MPI_Wait(&up_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
-          MPI_Wait(&down_r, MPI_STATUS_IGNORE);
+          MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
 
          iz = 1 - iz;
       }
