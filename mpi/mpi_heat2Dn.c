@@ -52,6 +52,7 @@ int checkboard = BLOCK;
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+
    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
       printf("We must have an equal number of blocks(ex 3x3,4x4)\n");
       MPI_Abort(MPI_COMM_WORLD,rc);
@@ -126,7 +127,7 @@ int checkboard = BLOCK;
       /* -----
       */
       //???????????????????????????????
-      //if (taskid == MASTER)
+      if (taskid == MASTER)
         MPI_Finalize();
       /* -----
       */
@@ -196,7 +197,10 @@ int checkboard = BLOCK;
          iz = 1 - iz;
       }
       end_time=MPI_Wtime();
-      task_time=start_time-end_time;
+      //allagh 
+      //task_time=start_time-end_time;
+      task_time = end_time - start_time;
+
       /* free data */
       MPI_Type_free(&MPI_column);
       MPI_Type_free(&MPI_row);
