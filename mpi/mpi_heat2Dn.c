@@ -86,8 +86,6 @@ int BLOCK, checkboard;
       sprintf(str, "%d", taskid);
       strcat(str, "initial.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
-      //if (taskid == MASTER)
-      //prtdat(BLOCK, BLOCK, u[0], "initial.dat");
       
       //for (iz=0; iz<0; iz++)
     /*    printf("taskid = %d\n", taskid);
@@ -220,16 +218,13 @@ int BLOCK, checkboard;
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
-        //printf("\ntaskid: %d Wait 2 End\n", taskid);
-
-        if (taskid == MASTER)
-        
+        //printf("\ntaskid: %d Wait 2 End\n", taskid);        
 
          iz = 1 - iz;
       }
       sprintf(str, "%d", taskid);
       strcat(str, "final.dat");
-      //prtdat(BLOCK, BLOCK, u[1], str);
+      prtdat(BLOCK + 1, BLOCK + 1, u[1], str);
 
       end_time=MPI_Wtime();
       //allagh 
@@ -323,13 +318,13 @@ int startx = 0, starty = 0;
 printf("taskid: %d, tasks: %d\n", taskid, tasks);
 if (taskid == 0)
 {
-  printf("(taskid == 0)\n");
+  //printf("(taskid == 0)\n");
   startx++;
   starty++;
 }
 else if (taskid == tasks - 1)
 {
-  printf("(taskid == tasks - 1)\n");
+  //printf("(taskid == tasks - 1)\n");
   nx--;
   ny--;
 }
@@ -337,22 +332,22 @@ else
 {
   if (taskid < sqrt(tasks))
   {
-    printf("(taskid < sqrt(tasks))\n");
+    //printf("(taskid < sqrt(tasks))\n");
     starty++;
   }
   else if (taskid >= tasks - sqrt(tasks))
   {
-    printf("(taskid >= tasks - sqrt(tasks))\n");
+    //printf("(taskid >= tasks - sqrt(tasks))\n");
     ny--;
   }
   if (taskid%(int)sqrt(tasks) == 0)
   {
-    printf("(taskid mod qrt(tasks) == 0)\n");
+    //printf("(taskid mod qrt(tasks) == 0)\n");
     startx++;
   }
   else if ((taskid + 1)%(int)sqrt(tasks) == 0)
   {
-    printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
+    //printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
     nx--;
   }
 }
