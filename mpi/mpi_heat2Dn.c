@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
+#define NXPROB      20                 /* x dimension of problem grid */
+#define NYPROB      20                 /* y dimension of problem grid */
 #define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -12,7 +15,6 @@
 #define MASTER      0                  /* taskid of first process */
 
 //New Params
-#define BLOCK 100
 #define LTAG        2                  /* message tag */
 #define RTAG        3                  /* message tag */
 #define UTAG        5                  /* message tag */
@@ -25,7 +27,7 @@ struct Parms {
 
 int main (int argc, char *argv[]){
 
-void inidat(), prtdat(), update(), update_hv(), firstAndLast();
+void inidat(), prtdat(), update(), update_hv(), firstAndLast(), inidat_block();
 float  ***u;        /* array for grid */
 int	taskid,                     /* this task's unique id */
 	numworkers,                 /* number of worker processes */
@@ -46,7 +48,7 @@ MPI_Datatype MPI_row,MPI_column;
 
 int row=0;
 double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
-int checkboard = BLOCK;
+int BLOCK, checkboard;
 
 /* First, find out my taskid and how many tasks are running */
    MPI_Init(&argc,&argv);
@@ -58,7 +60,11 @@ int checkboard = BLOCK;
       MPI_Abort(MPI_COMM_WORLD,rc);
       exit(1);
    }
-      /* allocate memory for block */
+   else 
+      BLOCK = (int)(sqrt(NXPROB * NYPROB / numtasks)); //get size of BLOCK
+
+////////////////////////////////////////////////////////////////////////////
+/* allocate memory for block */
       u=(float***)malloc(2*sizeof(float**));
       for(i=0;i<2;i++){
         u[i]=(float**)malloc((BLOCK+2)*sizeof(float*));
@@ -68,11 +74,27 @@ int checkboard = BLOCK;
       }
       /* Initialize everything - including the borders - to zero */
       for (iz=0; iz<2; iz++)
-         for (ix=0; ix<BLOCK+2; ix++)
-            for (iy=0; iy<BLOCK+2; iy++)
-               u[iz][ix][iy] = 0.0;
+        for (ix=0; ix<BLOCK+2; ix++)
+          for (iy=0; iy<BLOCK+2; iy++)
+            u[iz][ix][iy] = 0.0;
       /* Initialize block to random values */
-      inidat(BLOCK+2,BLOCK+2,u[0]);
+      inidat_block(BLOCK+2,BLOCK+2,u[0], taskid);
+
+     /* char str[50];
+      sprintf(str, "%d", taskid);
+      strcat(str, "initial.dat");
+      prtdat(BLOCK, BLOCK, u[0], str);*/
+      if (taskid == MASTER)
+      prtdat(BLOCK, BLOCK, u[0], "initial.dat");
+      
+      //for (iz=0; iz<0; iz++)
+        printf("taskid = %d\n", taskid);
+         for (ix=0; ix<BLOCK+2; ix++)
+            {for (iy=0; iy<BLOCK+2; iy++)
+              printf("%6.1f", u[0][ix][iy]);
+              printf("\n");}
+        printf("\n\n");
+////////////////////////////////////////////////////////////////////////////
 
       /* Calculate neighboors */
       row=(int)sqrt(numtasks);
@@ -118,22 +140,12 @@ int checkboard = BLOCK;
       }
 
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
-
+      //printf("taskid: %d u[1][1]: %f\n", taskid, u[1][1][0]);
       MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_column);
       MPI_Type_commit(&MPI_column);
       MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_row);
       MPI_Type_commit(&MPI_row);
-      // REMOVE THIS WHEN YOU ARE DONE WITH THE loop
-      /* -----
-      */
-      //???????????????????????????????
-      /*if (taskid == MASTER)
-      {
-        printf("- MPI_Finalize tash id %d -\n", taskid);
-        MPI_Finalize();
-      }*/
-      /* -----
-      */
+
       start_time=MPI_Wtime();
       /* for loop */
       iz = 0;
@@ -178,7 +190,8 @@ int checkboard = BLOCK;
 
         //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
         checkboard = BLOCK + 2;
-        update_hv(start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
+        //calculate white spaces
+        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -251,22 +264,23 @@ void update(int start, int end, int ny, float *u1, float *u2)
 /**************************************************************************
  *  subroutine update for both orientations
  ****************************************************************************/
-void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float *u1, float *u2)
+void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u1, float **u2)
 {
+  return;
    int ix, iy;
    for (ix = start_h; ix <= end_h; ix++)
       for (iy = start_v; iy <= end_v; iy++)
-         *(u2+ix*ny+iy) = *(u1+ix*ny+iy)  +
-                          parms.cx * (*(u1+(ix+1)*ny+iy) +
-                          *(u1+(ix-1)*ny+iy) -
-                          2.0 * *(u1+ix*ny+iy)) +
-                          parms.cy * (*(u1+ix*ny+iy+1) +
-                         *(u1+ix*ny+iy-1) -
-                          2.0 * *(u1+ix*ny+iy));
+        u2[ix][iy] = u1[ix][iy] +
+                          parms.cx * (u1[ix+1][iy] +
+                          u1[ix-1][iy] -
+                          2.0 * u1[ix][iy]) +
+                          parms.cy * (u1[ix][iy+1] +
+                         u1[ix][iy-1] -
+                          2.0 * u1[ix][iy]);
 }
 
 /*calculate first and last rows and columns*/
-void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v, int ny, float *u1, float *u2)
+void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v, int ny, float **u1, float **u2)
 {
   update_hv(start_h + 1, start_v, end_h - 1, start_v, checkboard, u1, u2);
   update_hv(start_h + 1, end_v, end_h - 1, end_v, checkboard, u1, u2);
@@ -277,24 +291,31 @@ void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v
 /*****************************************************************************
  *  subroutine inidat
  *****************************************************************************/
-void inidat(int nx, int ny, float **u) {
+void inidat(int nx, int ny, float *u) {
+int ix, iy;
+for (ix = 0; ix <= nx-1; ix++)
+  for (iy = 0; iy <= ny-1; iy++)
+     *(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+}
+
+void inidat_block(int nx, int ny, float **u, int taskid) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
 int ix, iy;
 for (ix = 0; ix < nx; ix++)
   for (iy = 0; iy < ny; iy++)
-     u[ix][iy] = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+     u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
 }
 
 /**************************************************************************
  * subroutine prtdat
  **************************************************************************/
-void prtdat(int nx, int ny, float *u1, char *fnam) {
+void prtdat(int nx, int ny, float **u1, char *fnam) {
 int ix, iy;
 FILE *fp;
 
 fp = fopen(fnam, "w");
 for (iy = ny-1; iy >= 0; iy--) {
-  for (ix = 0; ix <= nx-1; ix++) {
-    fprintf(fp, "%6.1f", *(u1+ix*ny+iy));
+  for (ix = 0; ix <= nx; ix++) {
+    fprintf(fp, "%6.1f", u1[ix][iy]);
     if (ix != nx-1)
       fprintf(fp, " ");
     else
