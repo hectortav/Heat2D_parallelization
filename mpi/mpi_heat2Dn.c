@@ -78,22 +78,22 @@ int BLOCK, checkboard;
           for (iy=0; iy<BLOCK+2; iy++)
             u[iz][ix][iy] = 0.0;
       /* Initialize block to random values */
-      inidat_block(BLOCK+2,BLOCK+2,u[0], taskid);
+      inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
-     /* char str[50];
+      char str[50];
       sprintf(str, "%d", taskid);
       strcat(str, "initial.dat");
-      prtdat(BLOCK, BLOCK, u[0], str);*/
-      if (taskid == MASTER)
-      prtdat(BLOCK, BLOCK, u[0], "initial.dat");
+      prtdat(BLOCK, BLOCK, u[0], str);
+      //if (taskid == MASTER)
+      //prtdat(BLOCK, BLOCK, u[0], "initial.dat");
       
       //for (iz=0; iz<0; iz++)
- /*       printf("taskid = %d\n", taskid);
+        printf("taskid = %d\n", taskid);
          for (ix=0; ix<BLOCK+2; ix++)
             {for (iy=0; iy<BLOCK+2; iy++)
               printf("%6.1f", u[0][ix][iy]);
               printf("\n");}
-        printf("\n\n");*/
+        printf("\n\n");
 ////////////////////////////////////////////////////////////////////////////
 
       /* Calculate neighboors */
@@ -221,11 +221,14 @@ int BLOCK, checkboard;
         //printf("\ntaskid: %d Wait 2 End\n", taskid);
 
         if (taskid == MASTER)
-        prtdat(BLOCK, BLOCK, u[1], "final.dat");
         
 
          iz = 1 - iz;
       }
+      sprintf(str, "%d", taskid);
+      strcat(str, "final.dat");
+      //prtdat(BLOCK, BLOCK, u[1], str);
+
       end_time=MPI_Wtime();
       //allagh 
       //task_time=start_time-end_time;
@@ -312,11 +315,49 @@ for (ix = 0; ix <= nx-1; ix++)
      *(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
 }
 
-void inidat_block(int nx, int ny, float **u, int taskid) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
+void inidat_block(int nx, int ny, float **u, int taskid, int tasks) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
 int ix, iy;
-for (ix = 0; ix < nx; ix++)
-  for (iy = 0; iy < ny; iy++)
-     u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+int startx = 0, starty = 0;
+printf("taskid: %d\n", taskid);
+if (taskid == 0)
+{
+  printf("(taskid == 0)\n");
+  startx++;
+  starty++;
+}
+else if (taskid == tasks - 1)
+{
+  printf("(taskid == tasks - 1)\n");
+  nx--;
+  ny--;
+}
+else
+{
+  if (taskid < sqrt(tasks))
+  {
+    printf("(taskid < sqrt(tasks))\n");
+    startx++;
+  }
+  else if (taskid >= tasks - sqrt(tasks))
+  {
+    printf("(taskid >= tasks - sqrt(tasks))\n");
+    nx--;
+  }
+  if (taskid%(int)sqrt(tasks) == 0)
+  {
+    printf("(taskid mod qrt(tasks) == 0)\n");
+    starty++;
+  }
+  else if ((taskid + 1)%(int)sqrt(tasks) == 0)
+  {
+    printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
+    ny--;
+  }
+}
+
+for (ix = startx; ix < nx; ix++)
+  for (iy = starty; iy < ny; iy++)
+     u[ix][iy] = 1.1;//(float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
 }
 
 /**************************************************************************
