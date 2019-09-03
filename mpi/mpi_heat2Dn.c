@@ -88,12 +88,12 @@ int BLOCK, checkboard;
       prtdat(BLOCK, BLOCK, u[0], "initial.dat");
       
       //for (iz=0; iz<0; iz++)
-        printf("taskid = %d\n", taskid);
+ /*       printf("taskid = %d\n", taskid);
          for (ix=0; ix<BLOCK+2; ix++)
             {for (iy=0; iy<BLOCK+2; iy++)
               printf("%6.1f", u[0][ix][iy]);
               printf("\n");}
-        printf("\n\n");
+        printf("\n\n");*/
 ////////////////////////////////////////////////////////////////////////////
 
       /* Calculate neighboors */
@@ -158,40 +158,41 @@ int BLOCK, checkboard;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
+            MPI_Isend(&u[iz][0][1], 1, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
-            MPI_Irecv(&u[iz][1][0], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
          }
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &Sright_r);
+            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
-            MPI_Irecv(&u[iz][1][BLOCK], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rright_r);
+            MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rright_r);
          }
          if (up != NONE)
          {
             //printf("up\n");
-            MPI_Isend(&u[iz][1][1], BLOCK, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+            MPI_Isend(&u[iz][1][0], 1, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
-            MPI_Irecv(&u[iz][0][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rup_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rup_r);
          }
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
+            MPI_Isend(&u[iz][BLOCK][0], 1, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
             source = down;
             msgtype = DTAG;
-            MPI_Irecv(&u[iz][BLOCK][1], BLOCK, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
+            MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
          }
 
         //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
         checkboard = BLOCK + 2;
         //calculate white spaces
-        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
+        //printf("\n\n%d %d - %d %d\n\n", start_h, end_h, start_v, end_v);
+        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -206,7 +207,7 @@ int BLOCK, checkboard;
         
         
 
-        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
+        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
@@ -218,6 +219,9 @@ int BLOCK, checkboard;
         if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 2 End\n", taskid);
+
+        if (taskid == MASTER)
+        prtdat(BLOCK, BLOCK, u[1], "final.dat");
         
 
          iz = 1 - iz;
@@ -238,7 +242,7 @@ int BLOCK, checkboard;
       free(u[0]);
       free(u[1]);
       free(u);*/
-      printf("- MPI_Finalize tash id %d -\n", taskid);
+      printf("- MPI_Finalize task id %d -\n", taskid);
       MPI_Finalize();
 }
 
@@ -266,10 +270,17 @@ void update(int start, int end, int ny, float *u1, float *u2)
  ****************************************************************************/
 void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u1, float **u2)
 {
-  return;
    int ix, iy;
    for (ix = start_h; ix <= end_h; ix++)
       for (iy = start_v; iy <= end_v; iy++)
+      {    
+       /* printf("ix: %d iy: %d\n", ix, iy);
+        printf("u1[ix][iy]: %6.1f\n", u1[ix][iy]);
+        printf("u1[ix-1][iy]: %6.1f\n", u1[ix-1][iy]);
+        printf("u1[ix+1][iy]: %6.1f\n", u1[ix+1][iy]);
+        printf("u1[ix][iy-1]: %6.1f\n", u1[ix][iy-1]);
+        printf("u1[ix][iy+1]: %6.1f\n", u1[ix][iy+1]);*/
+        
         u2[ix][iy] = u1[ix][iy] +
                           parms.cx * (u1[ix+1][iy] +
                           u1[ix-1][iy] -
@@ -277,21 +288,24 @@ void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u
                           parms.cy * (u1[ix][iy+1] +
                          u1[ix][iy-1] -
                           2.0 * u1[ix][iy]);
+      }
 }
 
 /*calculate first and last rows and columns*/
 void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v, int ny, float **u1, float **u2)
 {
-  update_hv(start_h + 1, start_v, end_h - 1, start_v, checkboard, u1, u2);
-  update_hv(start_h + 1, end_v, end_h - 1, end_v, checkboard, u1, u2);
-  update_hv(start_h, start_v, start_h, end_v, checkboard, u1, u2);
-  update_hv(end_h, start_v, end_h, end_v, checkboard, u1, u2);
+  //printf("%d %d %d %d\n", start_h, start_v + 1, start_h, end_v - 2);
+  update_hv(start_h , start_v, end_h - 1, start_v, checkboard, u1, u2);
+  update_hv(start_h , end_v - 1, end_h - 1, end_v - 1, checkboard, u1, u2);
+  update_hv(start_h, start_v + 1, start_h, end_v - 2, checkboard, u1, u2);
+  update_hv(end_h - 1, start_v, end_h - 1, end_v - 1, checkboard, u1, u2);
 }
 
 /*****************************************************************************
  *  subroutine inidat
  *****************************************************************************/
-void inidat(int nx, int ny, float *u) {
+void inidat(int nx, int ny, float *u) 
+{
 int ix, iy;
 for (ix = 0; ix <= nx-1; ix++)
   for (iy = 0; iy <= ny-1; iy++)
