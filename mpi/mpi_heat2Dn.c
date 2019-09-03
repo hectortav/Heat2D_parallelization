@@ -19,6 +19,8 @@
 #define RTAG        3                  /* message tag */
 #define UTAG        5                  /* message tag */
 #define DTAG        6                  /* message tag */
+#define MAX_TEMP    500
+#define MIN_TEMP    10
 
 struct Parms {
   float cx;
@@ -88,12 +90,12 @@ int BLOCK, checkboard;
       //prtdat(BLOCK, BLOCK, u[0], "initial.dat");
       
       //for (iz=0; iz<0; iz++)
-        printf("taskid = %d\n", taskid);
+    /*    printf("taskid = %d\n", taskid);
          for (ix=0; ix<BLOCK+2; ix++)
             {for (iy=0; iy<BLOCK+2; iy++)
               printf("%6.1f", u[0][ix][iy]);
               printf("\n");}
-        printf("\n\n");
+        printf("\n\n");*/
 ////////////////////////////////////////////////////////////////////////////
 
       /* Calculate neighboors */
@@ -357,7 +359,7 @@ else
 
 for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
-     u[ix][iy] = 1.1;//(float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+     u[ix][iy] = (float)(rand()%MAX_TEMP + MIN_TEMP);//(float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
 }
 
 /**************************************************************************
