@@ -83,7 +83,7 @@ int BLOCK, checkboard;
       char str[50];
       sprintf(str, "%d", taskid);
       strcat(str, "initial.dat");
-      prtdat(BLOCK, BLOCK, u[0], str);
+      prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
       //if (taskid == MASTER)
       //prtdat(BLOCK, BLOCK, u[0], "initial.dat");
       
@@ -318,7 +318,7 @@ for (ix = 0; ix <= nx-1; ix++)
 void inidat_block(int nx, int ny, float **u, int taskid, int tasks) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
 int ix, iy;
 int startx = 0, starty = 0;
-printf("taskid: %d\n", taskid);
+printf("taskid: %d, tasks: %d\n", taskid, tasks);
 if (taskid == 0)
 {
   printf("(taskid == 0)\n");
@@ -336,22 +336,22 @@ else
   if (taskid < sqrt(tasks))
   {
     printf("(taskid < sqrt(tasks))\n");
-    startx++;
+    starty++;
   }
   else if (taskid >= tasks - sqrt(tasks))
   {
     printf("(taskid >= tasks - sqrt(tasks))\n");
-    nx--;
+    ny--;
   }
   if (taskid%(int)sqrt(tasks) == 0)
   {
     printf("(taskid mod qrt(tasks) == 0)\n");
-    starty++;
+    startx++;
   }
   else if ((taskid + 1)%(int)sqrt(tasks) == 0)
   {
     printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
-    ny--;
+    nx--;
   }
 }
 
@@ -368,10 +368,10 @@ int ix, iy;
 FILE *fp;
 
 fp = fopen(fnam, "w");
-for (iy = ny-1; iy >= 0; iy--) {
+for (iy = 0; iy <= ny; iy++) {
   for (ix = 0; ix <= nx; ix++) {
     fprintf(fp, "%6.1f", u1[ix][iy]);
-    if (ix != nx-1)
+    if (ix != nx)
       fprintf(fp, " ");
     else
       fprintf(fp, "\n");
