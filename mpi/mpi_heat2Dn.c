@@ -127,8 +127,11 @@ int checkboard = BLOCK;
       /* -----
       */
       //???????????????????????????????
-      if (taskid == MASTER)
+      /*if (taskid == MASTER)
+      {
+        printf("- MPI_Finalize tash id %d -\n", taskid);
         MPI_Finalize();
+      }*/
       /* -----
       */
       start_time=MPI_Wtime();
@@ -136,6 +139,9 @@ int checkboard = BLOCK;
       iz = 0;
       for (it = 1; it <= STEPS; it++)
       {
+          //printf("\ntaskid: %d, it: %d\n", taskid, it);
+          //printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
+
          //if up exists then send to X and receive from X
          if (left != NONE)
          {
@@ -174,6 +180,7 @@ int checkboard = BLOCK;
         checkboard = BLOCK + 2;
         update_hv(start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
 
+        //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
           MPI_Wait(&Rleft_r, MPI_STATUS_IGNORE);
         if (right != NONE)
@@ -182,9 +189,13 @@ int checkboard = BLOCK;
           MPI_Wait(&Rup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
+        //printf("\ntaskid: %d Wait 1 End\n", taskid);
+        
+        
 
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, &u[iz][0][0], &u[1-iz][0][0]);
         
+        //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
         if (right != NONE)
@@ -193,6 +204,8 @@ int checkboard = BLOCK;
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
+        //printf("\ntaskid: %d Wait 2 End\n", taskid);
+        
 
          iz = 1 - iz;
       }
@@ -204,13 +217,15 @@ int checkboard = BLOCK;
       /* free data */
       MPI_Type_free(&MPI_column);
       MPI_Type_free(&MPI_row);
-      for(i=0;i<BLOCK+2;i++){
+      //free error?!
+     /* for(i=0;i<BLOCK+2;i++){
         free(u[0][i]);
         free(u[1][i]);
       }
       free(u[0]);
       free(u[1]);
-      free(u);
+      free(u);*/
+      printf("- MPI_Finalize tash id %d -\n", taskid);
       MPI_Finalize();
 }
 
