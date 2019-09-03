@@ -141,9 +141,9 @@ int BLOCK, checkboard;
 
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
       //printf("taskid: %d u[1][1]: %f\n", taskid, u[1][1][0]);
-      MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_column);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK+2, MPI_FLOAT, &MPI_column);
       MPI_Type_commit(&MPI_column);
-      MPI_Type_vector(BLOCK,1,BLOCK+2,MPI_FLOAT,&MPI_row);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_row);
       MPI_Type_commit(&MPI_row);
 
       start_time=MPI_Wtime();
@@ -158,26 +158,28 @@ int BLOCK, checkboard;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][0][1], 1, MPI_FLOAT, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
+            MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
-            MPI_Irecv(&u[iz][0][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
          }
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_FLOAT, right, LTAG, MPI_COMM_WORLD, &Sright_r);
+            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
-            MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rright_r);
+            MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
          }
          if (up != NONE)
          {
+            //printf("////////////////defore: %6.1f\n\n", u[iz][0][0]);
             //printf("up\n");
-            MPI_Isend(&u[iz][1][0], 1, MPI_FLOAT, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+            MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
-            MPI_Irecv(&u[iz][0][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rup_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);
+            //printf("////////////////after: %6.1f\n\n", u[iz][0][0]);
          }
          if (down != NONE)
          {
@@ -315,7 +317,7 @@ for (ix = 0; ix <= nx-1; ix++)
 void inidat_block(int nx, int ny, float **u, int taskid, int tasks) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
 int ix, iy;
 int startx = 0, starty = 0;
-printf("taskid: %d, tasks: %d\n", taskid, tasks);
+/*printf("taskid: %d, tasks: %d\n", taskid, tasks);
 if (taskid == 0)
 {
   //printf("(taskid == 0)\n");
@@ -349,12 +351,14 @@ else
   {
     //printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
     nx--;
-  }
+  }*/
 }
 
 for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
-     u[ix][iy] = (float)(rand()%MAX_TEMP + MIN_TEMP);//(float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+     u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+//every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
+//or the neighboring column/row will replace it
 }
 
 /**************************************************************************
