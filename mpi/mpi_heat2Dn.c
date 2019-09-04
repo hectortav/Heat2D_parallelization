@@ -6,7 +6,7 @@
 
 #define NXPROB      20                 /* x dimension of problem grid */
 #define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
+#define STEPS       10                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -158,7 +158,7 @@ int BLOCK, checkboard;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
+            MPI_Isend(&u[iz][1][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
             MPI_Irecv(&u[iz][0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
@@ -166,25 +166,23 @@ int BLOCK, checkboard;
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
+            MPI_Isend(&u[iz][1][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
             MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
          }
          if (up != NONE)
          {
-            //printf("////////////////defore: %6.1f\n\n", u[iz][0][0]);
             //printf("up\n");
-            MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+            MPI_Isend(&u[iz][1][1], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
             MPI_Irecv(&u[iz][0][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);
-            //printf("////////////////after: %6.1f\n\n", u[iz][0][0]);
          }
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK][0], 1, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
+            MPI_Isend(&u[iz][BLOCK][1], 1, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
             source = down;
             msgtype = DTAG;
             MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
@@ -193,8 +191,12 @@ int BLOCK, checkboard;
         //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
         checkboard = BLOCK + 2;
         //calculate white spaces
-        //printf("\n\n%d %d - %d %d\n\n", start_h, end_h, start_v, end_v);
-        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
+        
+        sprintf(str, "%d", taskid);
+        strcat(str, "final.dat");
+        prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+        
+        //update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -207,9 +209,7 @@ int BLOCK, checkboard;
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 1 End\n", taskid);
         
-        
-
-        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
+        //firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
@@ -220,13 +220,18 @@ int BLOCK, checkboard;
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
         if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
-        //printf("\ntaskid: %d Wait 2 End\n", taskid);        
+        //printf("\ntaskid: %d Wait 2 End\n", taskid);  
+
+        int k;
+        for (k = 0; k < BLOCK+2; k++)
+          printf("%6.1f ", u[0][k][0]);
+        printf("\n");
 
          iz = 1 - iz;
       }
       sprintf(str, "%d", taskid);
       strcat(str, "final.dat");
-      prtdat(BLOCK + 1, BLOCK + 1, u[1], str);
+      //prtdat(BLOCK + 1, BLOCK + 1, u[1], str);
 
       end_time=MPI_Wtime();
       //allagh 
@@ -351,12 +356,16 @@ else
   {
     //printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
     nx--;
-  }*/
-}
+  }
+}*/
 
 for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
-     u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+    {
+      u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+      if (u[ix][iy] != 0.0)
+        u[ix][iy] = 1.1;
+    }
 //every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
 //or the neighboring column/row will replace it
 }
