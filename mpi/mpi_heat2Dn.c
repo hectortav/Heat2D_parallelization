@@ -158,7 +158,7 @@ int BLOCK, checkboard;
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&u[iz][1][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
+            MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
             MPI_Irecv(&u[iz][0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
@@ -166,7 +166,7 @@ int BLOCK, checkboard;
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&u[iz][1][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
+            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
             MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
@@ -174,7 +174,7 @@ int BLOCK, checkboard;
          if (up != NONE)
          {
             //printf("up\n");
-            MPI_Isend(&u[iz][1][1], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+            MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
             MPI_Irecv(&u[iz][0][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);
@@ -182,10 +182,10 @@ int BLOCK, checkboard;
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK][1], 1, MPI_FLOAT, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
+            MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
             source = down;
             msgtype = DTAG;
-            MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_FLOAT, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
+            MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
          }
 
         //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
