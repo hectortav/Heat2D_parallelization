@@ -95,10 +95,10 @@ int BLOCK, checkboard;
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
       
       //for (iz=0; iz<0; iz++)
-    /*    printf("taskid = %d\n", taskid);
+      /*  printf("taskid = %d\n", taskid);
          for (ix=0; ix<BLOCK+2; ix++)
             {for (iy=0; iy<BLOCK+2; iy++)
-              printf("%6.1f", u[0][ix][iy]);
+              printf("[%d,%d] ", ix, iy);
               printf("\n");}
         printf("\n\n");*/
 ////////////////////////////////////////////////////////////////////////////
@@ -148,10 +148,15 @@ int BLOCK, checkboard;
 
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
       //printf("taskid: %d u[1][1]: %f\n", taskid, u[1][1][0]);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK+2, MPI_FLOAT, &MPI_row);
+      MPI_Type_commit(&MPI_row);
       MPI_Type_vector(BLOCK + 2, 1, BLOCK+2, MPI_FLOAT, &MPI_column);
       MPI_Type_commit(&MPI_column);
-      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_row);
+
+      MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
       MPI_Type_commit(&MPI_row);
+      MPI_Type_commit(&MPI_column);
 
       start_time=MPI_Wtime();
       /* for loop */
@@ -162,62 +167,42 @@ int BLOCK, checkboard;
           //printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
 
          //if up exists then send to X and receive from X
-         for (k=0;k<BLOCK+2;k++)
-         {
-           tbl[0][k] = u[iz][k][1]; //left
-           tbl[1][k] = u[iz][k][BLOCK]; //right
-           tbl[2][k] = u[iz][1][k]; //up
-           tbl[3][k] = u[iz][BLOCK][k]; //down
-         }
          if (left != NONE)
          {
             //printf("left\n");
-            MPI_Isend(&tbl[0][0], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
+            MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
             source = left;
             msgtype = LTAG;
-            MPI_Irecv(&tbl[0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
          }
          if (right != NONE)
          {
             //printf("right\n");
-            MPI_Isend(&tbl[1][0], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
+            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
             source = right;
             msgtype = RTAG;
-            MPI_Irecv(&tbl[1][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
+            MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
          }
          if (up != NONE)
          {
             //printf("up\n");
-            MPI_Isend(&tbl[2][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+            MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
             source = up;
             msgtype = UTAG;
-            MPI_Irecv(&tbl[2][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);
+            MPI_Irecv(&u[iz][0][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);
          }
          if (down != NONE)
          {
             //printf("down\n");
-            MPI_Isend(&tbl[3][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
+            MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
             source = down;
             msgtype = DTAG;
-            MPI_Irecv(&tbl[3][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
+            MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
          }
 
-        //update(start,end,BLOCK,&u[iz][0][0],&u[1-iz][0][0]);
         checkboard = BLOCK + 2;
         //calculate white spaces
-        for (k=0;k<BLOCK+2;k++)
-        {
-          if (left != NONE)
-            u[iz][k][0] = tbl[0][k]; //left
-          if (right != NONE)
-            u[iz][k][BLOCK+1] = tbl[1][k]; //right
-          if (up != NONE)          
-            u[iz][0][k] = tbl[2][k]; //up
-          if (down != NONE)
-            u[iz][BLOCK+1][k] = tbl[3][k]; //down
-        }
-
-        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
+        //update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -230,7 +215,7 @@ int BLOCK, checkboard;
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 1 End\n", taskid);
         
-        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
+        //firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
@@ -242,10 +227,6 @@ int BLOCK, checkboard;
         if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 2 End\n", taskid);  
-
-/*        for (k = 0; k < BLOCK+2; k++)
-          printf("%6.1f ", u[0][k][0]);
-        printf("\n");*/
 
          iz = 1 - iz;
       }
@@ -342,47 +323,13 @@ for (ix = 0; ix <= nx-1; ix++)
 void inidat_block(int nx, int ny, float **u, int taskid, int tasks) { //init in relation with taskid because we dont want all of the block starts-ends to be 0
 int ix, iy;
 int startx = 0, starty = 0;
-/*printf("taskid: %d, tasks: %d\n", taskid, tasks);
-if (taskid == 0)
-{
-  //printf("(taskid == 0)\n");
-  startx++;
-  starty++;
-}
-else if (taskid == tasks - 1)
-{
-  //printf("(taskid == tasks - 1)\n");
-  nx--;
-  ny--;
-}
-else
-{
-  if (taskid < sqrt(tasks))
-  {
-    //printf("(taskid < sqrt(tasks))\n");
-    starty++;
-  }
-  else if (taskid >= tasks - sqrt(tasks))
-  {
-    //printf("(taskid >= tasks - sqrt(tasks))\n");
-    ny--;
-  }
-  if (taskid%(int)sqrt(tasks) == 0)
-  {
-    //printf("(taskid mod qrt(tasks) == 0)\n");
-    startx++;
-  }
-  else if ((taskid + 1)%(int)sqrt(tasks) == 0)
-  {
-    //printf("((taskid + 1) mod sqrt(tasks) == 0)\n");
-    nx--;
-  }
-}*/
 
 for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
+      if (u[ix][iy] != 0.0)
+        u[ix][iy] = (float)(ix*100 + iy);
     }
 //every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
 //or the neighboring column/row will replace it
