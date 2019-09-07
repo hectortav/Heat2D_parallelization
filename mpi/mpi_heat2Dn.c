@@ -207,21 +207,17 @@ int BLOCK, checkboard;
         //calculate white spaces
         for (k=0;k<BLOCK+2;k++)
         {
-          u[iz][k][1] = tbl[0][k]; //left
-          u[iz][k][BLOCK] = tbl[1][k]; //right
-          u[iz][1][k] = tbl[2][k]; //up
-          u[iz][BLOCK][k] = tbl[3][k]; //down
+          if (left != NONE)
+            u[iz][k][0] = tbl[0][k]; //left
+          if (right != NONE)
+            u[iz][k][BLOCK+1] = tbl[1][k]; //right
+          if (up != NONE)          
+            u[iz][0][k] = tbl[2][k]; //up
+          if (down != NONE)
+            u[iz][BLOCK+1][k] = tbl[3][k]; //down
         }
 
-        for (i=0;i<4;i++)
-        {
-          for(k=0;k<BLOCK+2;k++)
-            printf("%6.1f ", tbl[i][k]);
-          printf("\n");
-        }
-        printf("\n");
-        
-       //update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
+        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -234,7 +230,7 @@ int BLOCK, checkboard;
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 1 End\n", taskid);
         
-        //firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
+        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
@@ -387,8 +383,6 @@ for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
-      if (u[ix][iy] != 0.0)
-        u[ix][iy] = 1.1;
     }
 //every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
 //or the neighboring column/row will replace it
