@@ -66,7 +66,9 @@ int BLOCK, checkboard;
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
 
     //MPI_Send_init
-    //MPI_Send_init(buf, 10, MPI_INT, dest, tag, MPI_COMM_WORLD, &r);
+    //MPI_Send_init(&u[iz][0][1], 1, MPI_column, left, RTAG, comm_cart, &Sleft_r);
+    //MPI_Isend(buf, 10, MPI_INT, 0, tag, MPI_COMM_WORLD, &sr );
+    //MPI_Isend(, 1, , , , comm_cart, &Sleft_r);
 
     row=(int)sqrt(numtasks);
    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
