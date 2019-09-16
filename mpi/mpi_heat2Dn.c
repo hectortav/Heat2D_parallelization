@@ -42,6 +42,7 @@ int	taskid,                     /* this task's unique id */
 MPI_Status status;
 
 //new vars
+float *line[2];
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
 MPI_Request Sleft_r, Sright_r, Sup_r, Sdown_r;  //send
@@ -57,7 +58,7 @@ int BLOCK, checkboard;
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
 
-    row=(int)sqrt(numtasks-1);
+    row=(int)sqrt(numtasks);
    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
       printf("We must have an equal number of blocks(ex 3x3,4x4)\n");
       MPI_Abort(MPI_COMM_WORLD,rc);
@@ -68,13 +69,18 @@ int BLOCK, checkboard;
 
 ////////////////////////////////////////////////////////////////////////////
 /* allocate memory for block */
-      u=(float***)malloc(2*sizeof(float**));
-      for(i=0;i<2;i++){
-        u[i]=(float**)malloc((BLOCK+2)*sizeof(float*));
-        for(j=0;j<(BLOCK+2);j++){
-          u[i][j]=(float*)malloc((BLOCK+2)*sizeof(float));
-        }
-      }
+      u = (float***)malloc(2*sizeof(float**));
+      u[0] = (float**)malloc((BLOCK+2)*sizeof(float*));
+      //malloc in a line so column stride can work
+      line[0] = (float*)malloc((BLOCK+2)*(BLOCK+2)*sizeof(float));
+      for(j = 0; j < BLOCK + 2; j++)
+          u[0][j] = j*(BLOCK+2) + line[0];
+      u[1] = (float**)malloc((BLOCK+2)*sizeof(float*));
+      //malloc in a line so column stride can work
+      line[1] = (float*)malloc((BLOCK+2)*(BLOCK+2)*sizeof(float));
+      for(j = 0; j < BLOCK + 2; j++)
+          u[1][j] = j*(BLOCK+2) + line[1];
+
 
       /* Initialize everything - including the borders - to zero */
       for (iz=0; iz<2; iz++)
@@ -96,6 +102,11 @@ int BLOCK, checkboard;
               printf("[%d,%d]\t", ix, iy);
               printf("\n");}
         printf("\n\n");*/
+
+      MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
+      MPI_Type_commit(&MPI_row);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
+      MPI_Type_commit(&MPI_column);
 ////////////////////////////////////////////////////////////////////////////
 
       /* Calculate neighboors */
@@ -143,10 +154,10 @@ int BLOCK, checkboard;
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
       //printf("taskid: %d u[1][1]: %f\n", taskid, u[1][1][0]);
 
-      MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
-      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
-      MPI_Type_commit(&MPI_row);
-      MPI_Type_commit(&MPI_column);
+      //Y orizontia
+      //X katheta
+      //printf("%p %p %p\n\n", &u[0][0][0], &u[0][1][0], &u[0][0][1]);
+      //printf("(%ld %ld)\n", &u[0][1][0] - &u[0][0][0], &u[0][0][1] - &u[0][0][0]);
 
       /* for loop */
       iz = 0;
@@ -189,7 +200,7 @@ int BLOCK, checkboard;
 
         checkboard = BLOCK + 2;
         //calculate white spaces
-        //update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
+        update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
         if (left != NONE)
@@ -202,7 +213,7 @@ int BLOCK, checkboard;
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 1 End\n", taskid);
         
-        //firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
+        firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
         if (left != NONE)
@@ -228,6 +239,12 @@ int BLOCK, checkboard;
       MPI_Type_free(&MPI_column);
       MPI_Type_free(&MPI_row);
       //free error?!
+      free(line[1]);
+      free(line[0]);
+      free(u[1]);
+      free(u[0]);
+      free(u);
+
       /*for(i=0;i<BLOCK+2;i++){
         free(u[0][i]);
         free(u[1][i]);
@@ -313,8 +330,13 @@ for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
-      if (u[ix][iy] != 0.0)
-        {u[ix][iy] = (float)(ix*10+iy);}//u[ix][iy] = 1.1;
+      //if (u[ix][iy] != 0.0)
+        //u[ix][iy] = 1.1;
+      /*if (taskid == 0)
+      u[ix][iy] = ((float)ix+(float)((float)iy/100.0));
+      else
+      u[ix][iy] = (float)taskid;*/
+
     }
 //every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
 //or the neighboring column/row will replace it
@@ -328,10 +350,11 @@ int ix, iy;
 FILE *fp;
 
 fp = fopen(fnam, "w");
-for (iy = 0; iy <= ny; iy++) {
-  for (ix = 0; ix <= nx; ix++) {
-    fprintf(fp, "%6.1f", u1[ix][iy]);
-    if (ix != nx)
+for (ix = 0; ix <= nx; ix++) {
+  for (iy = 0; iy <= ny; iy++) {
+    //fprintf(fp, "%p", &u1[ix][iy]);
+    fprintf(fp, "%6.2f", u1[ix][iy]);
+    if (iy != ny)
       fprintf(fp, " ");
     else
       fprintf(fp, "\n");
