@@ -225,10 +225,11 @@ void update(int start, int end, int ny, float *u1, float *u2)
  *****************************************************************************/
 void inidat(int nx, int ny, float *u) {
 int ix, iy;
-
 for (ix = 0; ix <= nx-1; ix++)
   for (iy = 0; iy <= ny-1; iy++)
-     *(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+     {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+     if (*(u+ix*ny+iy) > 10000.0)
+     printf("%f\n", *(u+ix*ny+iy));}
 }
 
 /**************************************************************************

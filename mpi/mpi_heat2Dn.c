@@ -42,6 +42,13 @@ int	taskid,                     /* this task's unique id */
 MPI_Status status;
 
 //new vars
+//Comm_world
+MPI_Comm comm_cart;
+int ndims;
+int dims[ndims];
+int periods[ndims];
+int reorder;
+
 float *line[2];
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
@@ -57,6 +64,9 @@ int BLOCK, checkboard;
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+
+    //MPI_Send_init
+    //MPI_Send_init(buf, 10, MPI_INT, dest, tag, MPI_COMM_WORLD, &r);
 
     row=(int)sqrt(numtasks);
    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
@@ -83,6 +93,7 @@ int BLOCK, checkboard;
 
 
       /* Initialize everything - including the borders - to zero */
+      //Y orizontia   //X katheta
       for (iz=0; iz<2; iz++)
         for (ix=0; ix<BLOCK+2; ix++)
           for (iy=0; iy<BLOCK+2; iy++)
@@ -95,19 +106,14 @@ int BLOCK, checkboard;
       strcat(str, "initial.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
       
-      //for (iz=0; iz<0; iz++)
-        /*printf("taskid = %d\n", taskid);
-         for (ix=0; ix<BLOCK+2; ix++)
-            {for (iy=0; iy<BLOCK+2; iy++)
-              printf("[%d,%d]\t", ix, iy);
-              printf("\n");}
-        printf("\n\n");*/
-
-      MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
-      MPI_Type_commit(&MPI_row);
-      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
-      MPI_Type_commit(&MPI_column);
 ////////////////////////////////////////////////////////////////////////////
+
+      ndims = 2;
+      reorder = 0;
+      for (i = 0; i < ndims; i++) { periods[i] = 0; dims[i] = row;}
+      //int MPI_Cart_create(MPI_Comm comm_old, int ndims, const int dims[],
+      //              const int periods[], int reorder, MPI_Comm *comm_cart)
+      MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, periods, reorder, &comm_cart);
 
       /* Calculate neighboors */
 
@@ -151,78 +157,61 @@ int BLOCK, checkboard;
         right=taskid+1;
       }
 
+      MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
+      MPI_Type_commit(&MPI_row);
+      MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
+      MPI_Type_commit(&MPI_column);
+
+      //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
+      MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
+      MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
-      //printf("taskid: %d u[1][1]: %f\n", taskid, u[1][1][0]);
-
-      //Y orizontia
-      //X katheta
-      //printf("%p %p %p\n\n", &u[0][0][0], &u[0][1][0], &u[0][0][1]);
-      //printf("(%ld %ld)\n", &u[0][1][0] - &u[0][0][0], &u[0][0][1] - &u[0][0][0]);
-
       /* for loop */
       iz = 0;
+      if (left <= NONE)  left = MPI_PROC_NULL;
+      if (right <= NONE)  right = MPI_PROC_NULL;
+      if (up <= NONE)  up = MPI_PROC_NULL;
+      if (down <= NONE)  down = MPI_PROC_NULL;
+
+      MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
       {
         //if up exists then send to X and receive from X
-        if (left != NONE)
-        {
-            //printf("left\n");
-            MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, MPI_COMM_WORLD, &Sleft_r);
-            source = left;
-            msgtype = LTAG;
-            MPI_Irecv(&u[iz][0][0], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rleft_r);
-        }
-        if (right != NONE)
-        {
-            //printf("right\n");
-            MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, MPI_COMM_WORLD, &Sright_r);
-            source = right;
-            msgtype = RTAG;
-            MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, source, msgtype, MPI_COMM_WORLD, &Rright_r);
-        }        
-        if (up != NONE)
-        {
-            //printf("up\n");
-            MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
-            source = up;
-            msgtype = UTAG;
-            MPI_Irecv(&u[iz][0][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rup_r);  
-        }
-        if (down != NONE)
-        {
-            //printf("down\n");
-            MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
-            source = down;
-            msgtype = DTAG;
-            MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, source, msgtype, MPI_COMM_WORLD, &Rdown_r);
-        }
+        //printf("left\n");
+        //source = left;            //msgtype = LTAG;
+        MPI_Irecv(&u[iz][0][0], 1, MPI_column, left, LTAG, comm_cart, &Rleft_r);
+        MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, comm_cart, &Sleft_r);
+        //printf("right\n");
+        //source = right;            //msgtype = RTAG;
+        MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, right, RTAG, comm_cart, &Rright_r);
+        MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, comm_cart, &Sright_r);
+        //printf("up\n");
+        //source = up;            //msgtype = UTAG;
+        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, MPI_COMM_WORLD, &Rup_r);  
+        MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+        //printf("down\n");
+        //source = down;            //msgtype = DTAG;
+        MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, MPI_COMM_WORLD, &Rdown_r);
+        MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
 
         checkboard = BLOCK + 2;
         //calculate white spaces
         update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //printf("\ntaskid: %d Wait 1 Start\n", taskid);
-        if (left != NONE)
           MPI_Wait(&Rleft_r, MPI_STATUS_IGNORE);
-        if (right != NONE)
           MPI_Wait(&Rright_r, MPI_STATUS_IGNORE);
-        if (up != NONE)
           MPI_Wait(&Rup_r, MPI_STATUS_IGNORE);
-        if (down != NONE)
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 1 End\n", taskid);
         
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
         
         //printf("\ntaskid: %d Wait 2 Start\n", taskid);
-        if (left != NONE)
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
-        if (right != NONE)
           MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
-        if (up != NONE)
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
-        if (down != NONE)
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
         //printf("\ntaskid: %d Wait 2 End\n", taskid);  
 
@@ -330,8 +319,8 @@ for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
-      //if (u[ix][iy] != 0.0)
-        //u[ix][iy] = 1.1;
+      if (u[ix][iy] != 0.0)
+        u[ix][iy] = 1.1;
       /*if (taskid == 0)
       u[ix][iy] = ((float)ix+(float)((float)iy/100.0));
       else
