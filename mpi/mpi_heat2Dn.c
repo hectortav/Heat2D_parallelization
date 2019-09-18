@@ -218,7 +218,7 @@ int BLOCK, checkboard;
       //--------------------------------------------------------------
       //                for loop
       //--------------------------------------------------------------
-
+      checkboard=BLOCK+2;
       MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
@@ -260,7 +260,6 @@ int BLOCK, checkboard;
         //                Calculate white spaces
         //--------------------------------------------------------------
 
-        checkboard = BLOCK + 2;
         update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //--------------------------------------------------------------
@@ -281,6 +280,7 @@ int BLOCK, checkboard;
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
+        
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
