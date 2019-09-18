@@ -60,7 +60,10 @@ int row=0;
 double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
 int BLOCK, checkboard;
 
-/* First, find out my taskid and how many tasks are running */
+  //--------------------------------------------------------------
+  // Find out taskid and how many tasks are running
+  //--------------------------------------------------------------
+
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
@@ -70,17 +73,22 @@ int BLOCK, checkboard;
     //MPI_Isend(buf, 10, MPI_INT, 0, tag, MPI_COMM_WORLD, &sr );
     //MPI_Isend(, 1, , , , comm_cart, &Sleft_r);
 
+    //--------------------------------------------------------------
+    // Calculate number of tasks in each row
+    //--------------------------------------------------------------
     row=(int)sqrt(numtasks);
-   if(sqrt(numtasks)!=floor(sqrt(numtasks))){
+    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
       printf("We must have an equal number of blocks(ex 3x3,4x4)\n");
       MPI_Abort(MPI_COMM_WORLD,rc);
       exit(1);
-   }
-   else 
+    }
+    else{
       BLOCK = (int)(sqrt(NXPROB * NYPROB / numtasks)); //get size of BLOCK
+    }
+      //--------------------------------------------------------------
+      // Allocate memory for block
+      //--------------------------------------------------------------
 
-////////////////////////////////////////////////////////////////////////////
-/* allocate memory for block */
       u = (float***)malloc(2*sizeof(float**));
       u[0] = (float**)malloc((BLOCK+2)*sizeof(float*));
       //malloc in a line so column stride can work
@@ -93,31 +101,37 @@ int BLOCK, checkboard;
       for(j = 0; j < BLOCK + 2; j++)
           u[1][j] = j*(BLOCK+2) + line[1];
 
+     //--------------------------------------------------------------
+     // Initialize everything - including the borders - to zero
+     //--------------------------------------------------------------
+     //Y orizontia   //X katheta
 
-      /* Initialize everything - including the borders - to zero */
-      //Y orizontia   //X katheta
       for (iz=0; iz<2; iz++)
         for (ix=0; ix<BLOCK+2; ix++)
           for (iy=0; iy<BLOCK+2; iy++)
             u[iz][ix][iy] = 0.0;
-      /* Initialize block to random valutes */
+
+      //--------------------------------------------------------------
+      // Initialize block to random values
+      //--------------------------------------------------------------
+
       inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
       char str[50];
       sprintf(str, "%d", taskid);
       strcat(str, "initial.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
-      
+
 ////////////////////////////////////////////////////////////////////////////
 
       ndims = 2;
       reorder = 0;
       for (i = 0; i < ndims; i++) { periods[i] = 0; dims[i] = row;}
-      //int MPI_Cart_create(MPI_Comm comm_old, int ndims, const int dims[],
-      //              const int periods[], int reorder, MPI_Comm *comm_cart)
       MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, periods, reorder, &comm_cart);
 
-      /* Calculate neighboors */
+      //--------------------------------------------------------------
+      //Calculate neighbor task ids (if they exist)
+      //--------------------------------------------------------------
 
       /* up */
       if(taskid<row){
@@ -159,90 +173,145 @@ int BLOCK, checkboard;
         right=taskid+1;
       }
 
+      //--------------------------------------------------------------
+      //                Datatypes initialization
+      //--------------------------------------------------------------
+
       MPI_Type_vector(BLOCK + 2, 1, 1, MPI_FLOAT, &MPI_row);
       MPI_Type_commit(&MPI_row);
       MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
       MPI_Type_commit(&MPI_column);
 
+      //--------------------------------------------------------------
+      //                Cartesian communicator
+      //--------------------------------------------------------------
       //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
+
       MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
       MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
-      /* for loop */
       iz = 0;
       if (left <= NONE)  left = MPI_PROC_NULL;
       if (right <= NONE)  right = MPI_PROC_NULL;
       if (up <= NONE)  up = MPI_PROC_NULL;
       if (down <= NONE)  down = MPI_PROC_NULL;
 
+
+      //--------------------------------------------------------------
+      //                for loop
+      //--------------------------------------------------------------
+
       MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
       {
-        //if up exists then send to X and receive from X
-        //printf("left\n");
-        //source = left;            //msgtype = LTAG;
+        //--------------------------------------------------------------
+        //                Send-Receive
+        //--------------------------------------------------------------
+
+        //--------------------------------------------------------------
+        //                left
+        //--------------------------------------------------------------
+
         MPI_Irecv(&u[iz][0][0], 1, MPI_column, left, LTAG, comm_cart, &Rleft_r);
         MPI_Isend(&u[iz][0][1], 1, MPI_column, left, RTAG, comm_cart, &Sleft_r);
-        //printf("right\n");
-        //source = right;            //msgtype = RTAG;
+
+        //--------------------------------------------------------------
+        //                right
+        //--------------------------------------------------------------
+
         MPI_Irecv(&u[iz][0][BLOCK+1], 1, MPI_column, right, RTAG, comm_cart, &Rright_r);
         MPI_Isend(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, comm_cart, &Sright_r);
-        //printf("up\n");
-        //source = up;            //msgtype = UTAG;
-        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, MPI_COMM_WORLD, &Rup_r);  
+
+        //--------------------------------------------------------------
+        //                up
+        //--------------------------------------------------------------
+
+        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, MPI_COMM_WORLD, &Rup_r);
         MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
-        //printf("down\n");
-        //source = down;            //msgtype = DTAG;
+
+        //--------------------------------------------------------------
+        //                down
+        //--------------------------------------------------------------
+
         MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, MPI_COMM_WORLD, &Rdown_r);
         MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
 
+
+        //--------------------------------------------------------------
+        //                Calculate white spaces
+        //--------------------------------------------------------------
+
         checkboard = BLOCK + 2;
-        //calculate white spaces
         update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
-        //printf("\ntaskid: %d Wait 1 Start\n", taskid);
+        //--------------------------------------------------------------
+        //                Wait for all
+        //--------------------------------------------------------------
+
           MPI_Wait(&Rleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rup_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
-        //printf("\ntaskid: %d Wait 1 End\n", taskid);
-        
+
+        //--------------------------------------------------------------
+        //                Calculate for all
+        //--------------------------------------------------------------
+
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
-        
-        //printf("\ntaskid: %d Wait 2 Start\n", taskid);
+
+        //--------------------------------------------------------------
+        //                Wait for all
+        //--------------------------------------------------------------
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
-        //printf("\ntaskid: %d Wait 2 End\n", taskid);  
+
+          //--------------------------------------------------------------
+          //                Next loop
+          //--------------------------------------------------------------
 
          iz = 1 - iz;
       }
+      //--------------------------------------------------------------
+      //               Loop ends here
+      //--------------------------------------------------------------
+      //--------------------------------------------------------------
+      //               Calculate elapsed time
+      //--------------------------------------------------------------
+
       end_time=MPI_Wtime();
       task_time = end_time - start_time;
+
+      //--------------------------------------------------------------
+      //                Print data
+      //--------------------------------------------------------------
 
       sprintf(str, "%d", taskid);
       strcat(str, "final.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
 
-      /* free data */
+      //--------------------------------------------------------------
+      //                Free datatypes
+      //--------------------------------------------------------------
+
       MPI_Type_free(&MPI_column);
       MPI_Type_free(&MPI_row);
-      //free error?!
+
+      //--------------------------------------------------------------
+      //                Free allocated memory
+      //--------------------------------------------------------------
+
       free(line[1]);
       free(line[0]);
       free(u[1]);
       free(u[0]);
       free(u);
 
-      /*for(i=0;i<BLOCK+2;i++){
-        free(u[0][i]);
-        free(u[1][i]);
-      }
-      free(u[0]);
-      free(u[1]);
-      free(u);*/
+      //--------------------------------------------------------------
+      //                End of each task
+      //--------------------------------------------------------------
       printf("- MPI_Finalize task id %d -\n", taskid);
       MPI_Finalize();
 }
@@ -274,14 +343,14 @@ void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u
    int ix, iy;
    for (ix = start_h; ix <= end_h; ix++)
       for (iy = start_v; iy <= end_v; iy++)
-      {    
+      {
        /* printf("ix: %d iy: %d\n", ix, iy);
         printf("u1[ix][iy]: %6.1f\n", u1[ix][iy]);
         printf("u1[ix-1][iy]: %6.1f\n", u1[ix-1][iy]);
         printf("u1[ix+1][iy]: %6.1f\n", u1[ix+1][iy]);
         printf("u1[ix][iy-1]: %6.1f\n", u1[ix][iy-1]);
         printf("u1[ix][iy+1]: %6.1f\n", u1[ix][iy+1]);*/
-        
+
         u2[ix][iy] = u1[ix][iy] +
                           parms.cx * (u1[ix+1][iy] +
                           u1[ix-1][iy] -
@@ -305,7 +374,7 @@ void firstAndLast(int checkboard, int start_h, int start_v, int end_h, int end_v
 /*****************************************************************************
  *  subroutine inidat
  *****************************************************************************/
-void inidat(int nx, int ny, float *u) 
+void inidat(int nx, int ny, float *u)
 {
 int ix, iy;
 for (ix = 0; ix <= nx-1; ix++)
