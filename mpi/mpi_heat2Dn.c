@@ -206,14 +206,14 @@ int BLOCK, checkboard;
       MPI_Recv_init(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, comm_cart, &Rdown_r);
 
 
-      /*MPI_Start(&Sleft_r);
+      MPI_Start(&Sleft_r);
       MPI_Start(&Sright_r); 
       MPI_Start(&Sup_r); 
       MPI_Start(&Sdown_r); 
       MPI_Start(&Rleft_r); 
       MPI_Start(&Rright_r); 
       MPI_Start(&Rup_r); 
-      MPI_Start(&Rdown_r);*/
+      MPI_Start(&Rdown_r);
 
       //--------------------------------------------------------------
       //                for loop
