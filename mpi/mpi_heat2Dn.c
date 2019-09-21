@@ -182,7 +182,6 @@ int BLOCK, checkboard;
       //                Cartesian communicator
       //--------------------------------------------------------------
       //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
-      MPI_Barrier(comm_cart);
       MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
       MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
