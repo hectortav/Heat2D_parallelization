@@ -28,7 +28,7 @@
 
 #define NXPROB      20                 /* x dimension of problem grid */
 #define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
+#define STEPS       10                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -75,7 +75,7 @@ for (ix = 0; ix <= nx-1; ix++)
 /**************************************************************************
  * subroutine prtdat
  **************************************************************************/
-void prtdat(int nx, int ny, float *u1, char *fnam) {
+void prtdat(int nx, int ny, float *u1, const char *fnam) {
 int ix, iy;
 FILE *fp;
 
@@ -94,23 +94,52 @@ fclose(fp);
 
 int main (int argc, char *argv[])
 {
+   int i;
    float *u;
    float *cuda_u0, *cuda_u1;
+   cudaEvent_t start, stop;
+   cudaEventCreate(&start);
+   cudaEventCreate(&stop);
+   float ms = 0.0;
 
-   //malloc local 
+   //malloc host 
    u = (float*)malloc(NXPROB*NYPROB*sizeof(float));
 
-   //malloc cuda
+   //malloc device
    cudaMalloc((void**)&cuda_u0, (NXPROB*NYPROB*sizeof(float)));
    cudaMalloc((void**)&cuda_u1, (NXPROB*NYPROB*sizeof(float)));
 
    //initialize
    inidat(NXPROB, NYPROB, u);
+   //print
+   prtdat(NXPROB, NYPROB, u, "initial.dat");
 
-   //copy from local to cuda
+   //copy from host to device
    cudaMemcpy(cuda_u0, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
    cudaMemcpy(cuda_u1, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
 
+   cudaEventRecord(start);
+   for (i = 0; i < STEPS; i++)
+   {
+
+   }
+   cudaEventRecord(stop);
+
+
+   //copy from device to host   
+   cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);
+
+   //print
+   prtdat(NXPROB, NYPROB, u, "final.dat");
+   cudaEventSynchronize(stop);
+   cudaEventElapsedTime(&ms, start, stop);
+   printf("ms: %4.10f\n", ms);
+
+   cudaFree(cuda_u0);
+   cudaFree(cuda_u1);
+   free(u);
+   cudaEventDestroy(start);
+   cudaEventDestroy(stop);
 
    return 0;
 }

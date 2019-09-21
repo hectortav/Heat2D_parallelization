@@ -56,6 +56,8 @@ MPI_Request Sleft_r, Sright_r, Sup_r, Sdown_r;  //send
 MPI_Request Rleft_r, Rright_r, Rup_r, Rdown_r;  //receive
 MPI_Datatype MPI_row,MPI_column;
 
+char str[50];
+
 int row=0;
 double start_time=0.0,end_time=0.0,task_time=0.0,reduced_time=0.0;
 int BLOCK, checkboard;
@@ -113,7 +115,6 @@ int BLOCK, checkboard;
 
       inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
-      char str[50];
       sprintf(str, "%d", taskid);
       strcat(str, "initial.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
