@@ -4,8 +4,8 @@
 #include <math.h>
 #include <string.h>
 
-#define NXPROB      20                 /* x dimension of problem grid */
-#define NYPROB      20                 /* y dimension of problem grid */
+#define NXPROB      2000                 /* x dimension of problem grid */
+#define NYPROB      2000                /* y dimension of problem grid */
 #define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -67,6 +67,7 @@ int BLOCK, checkboard;
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+
 
     //--------------------------------------------------------------
     // Calculate number of tasks in each row
@@ -177,11 +178,11 @@ int BLOCK, checkboard;
       MPI_Type_vector(BLOCK + 2, 1, BLOCK + 2, MPI_FLOAT, &MPI_column);
       MPI_Type_commit(&MPI_column);
 
-            //--------------------------------------------------------------
+      //--------------------------------------------------------------
       //                Cartesian communicator
       //--------------------------------------------------------------
       //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
-
+      MPI_Barrier(comm_cart);
       MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
       MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
       printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
@@ -191,29 +192,6 @@ int BLOCK, checkboard;
       if (up <= NONE)  up = MPI_PROC_NULL;
       if (down <= NONE)  down = MPI_PROC_NULL;
 
-      //--------------------------------------------------------------
-      //               MPI Send - Recv - Start
-      //--------------------------------------------------------------
-
-      MPI_Send_init(&u[iz][0][1], 1, MPI_column, left, RTAG, comm_cart, &Sleft_r);
-      MPI_Send_init(&u[iz][0][BLOCK], 1, MPI_column, right, LTAG, comm_cart, &Sright_r);
-      MPI_Send_init(&u[iz][1][0], 1, MPI_row, up, DTAG, comm_cart, &Sup_r);
-      MPI_Send_init(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, comm_cart, &Sdown_r);
-      
-      MPI_Recv_init(&u[iz][0][0], 1, MPI_column, left, LTAG, comm_cart, &Rleft_r);
-      MPI_Recv_init(&u[iz][0][BLOCK+1], 1, MPI_column, right, RTAG, comm_cart, &Rright_r);
-      MPI_Recv_init(&u[iz][0][0], 1, MPI_row, up, UTAG, comm_cart, &Rup_r);
-      MPI_Recv_init(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, comm_cart, &Rdown_r);
-
-
-      MPI_Start(&Sleft_r);
-      MPI_Start(&Sright_r); 
-      MPI_Start(&Sup_r); 
-      MPI_Start(&Sdown_r); 
-      MPI_Start(&Rleft_r); 
-      MPI_Start(&Rright_r); 
-      MPI_Start(&Rup_r); 
-      MPI_Start(&Rdown_r);
 
       //--------------------------------------------------------------
       //                for loop
@@ -245,15 +223,15 @@ int BLOCK, checkboard;
         //                up
         //--------------------------------------------------------------
 
-        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, comm_cart, &Rup_r);
-        MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, comm_cart, &Sup_r);
+        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, MPI_COMM_WORLD, &Rup_r);
+        MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
 
         //--------------------------------------------------------------
         //                down
         //--------------------------------------------------------------
 
-        MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, comm_cart, &Rdown_r);
-        MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, comm_cart, &Sdown_r);
+        MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, MPI_COMM_WORLD, &Rdown_r);
+        MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
 
 
         //--------------------------------------------------------------
@@ -280,7 +258,7 @@ int BLOCK, checkboard;
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
-        
+
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
@@ -301,7 +279,8 @@ int BLOCK, checkboard;
 
       end_time=MPI_Wtime();
       task_time = end_time - start_time;
-
+      MPI_Barrier(comm_cart);
+      MPI_Reduce(&task_time,&reduced_time,1,MPI_DOUBLE,MPI_MAX,0,comm_cart);
       //--------------------------------------------------------------
       //                Print data
       //--------------------------------------------------------------
@@ -309,6 +288,8 @@ int BLOCK, checkboard;
       sprintf(str, "%d", taskid);
       strcat(str, "final.dat");
       prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      if(taskid==MASTER)
+        printf("Elapsed time (in seconds) : %f \n",reduced_time);
 
       //--------------------------------------------------------------
       //                Free datatypes
@@ -326,15 +307,6 @@ int BLOCK, checkboard;
       free(u[1]);
       free(u[0]);
       free(u);
-      /*MPI_Request_free(&Sleft_r);
-      MPI_Request_free(&Sright_r); 
-      MPI_Request_free(&Sup_r); 
-      MPI_Request_free(&Sdown_r); 
-      MPI_Request_free(&Rleft_r); 
-      MPI_Request_free(&Rright_r); 
-      MPI_Request_free(&Rup_r); 
-      MPI_Request_free(&Rdown_r);*/
- 
 
       //--------------------------------------------------------------
       //                End of each task
@@ -417,8 +389,8 @@ for (ix = startx; ix < nx; ix++)
   for (iy = starty; iy < ny; iy++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
-    //  if (u[ix][iy] != 0.0)
-    //    u[ix][iy] = 1.1;
+      if (u[ix][iy] != 0.0)
+        u[ix][iy] = 1.1;
       /*if (taskid == 0)
       u[ix][iy] = ((float)ix+(float)((float)iy/100.0));
       else
