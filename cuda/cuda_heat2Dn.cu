@@ -38,6 +38,10 @@
 #define DONE        4                  /* message tag */
 #define MASTER      0                  /* taskid of first process */
 
+#define BLOCK_H   5
+#define BLOCK_V   5
+#define THREADS   32
+
 struct Parms {
   float cx;
   float cy;
@@ -92,6 +96,11 @@ for (iy = ny-1; iy >= 0; iy--) {
 fclose(fp);
 }
 
+__global__ void cuda_update(float *u0, float *u1)
+{
+   printf("Hello\n");
+}
+
 int main (int argc, char *argv[])
 {
    int i;
@@ -102,6 +111,9 @@ int main (int argc, char *argv[])
    cudaEventCreate(&stop);
    float ms = 0.0;
 
+   dim3 dimBlocks(BLOCK_H, BLOCK_V);
+   dim3 dimThreads((NXPROB / BLOCK_H) + ((NXPROB % BLOCK_H) != 0), (NYPROB / BLOCK_V) + ((NYPROB % BLOCK_V) != 0));
+
    //malloc host 
    u = (float*)malloc(NXPROB*NYPROB*sizeof(float));
 
@@ -109,10 +121,8 @@ int main (int argc, char *argv[])
    cudaMalloc((void**)&cuda_u0, (NXPROB*NYPROB*sizeof(float)));
    cudaMalloc((void**)&cuda_u1, (NXPROB*NYPROB*sizeof(float)));
 
-   //initialize
-   inidat(NXPROB, NYPROB, u);
-   //print
-   prtdat(NXPROB, NYPROB, u, "initial.dat");
+   inidat(NXPROB, NYPROB, u); //initialize
+   prtdat(NXPROB, NYPROB, u, "initial.dat"); //print
 
    //copy from host to device
    cudaMemcpy(cuda_u0, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
@@ -120,20 +130,18 @@ int main (int argc, char *argv[])
 
    cudaEventRecord(start);
    for (i = 0; i < STEPS; i++)
-   {
-
-   }
+      if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1);}
+      else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0);}
    cudaEventRecord(stop);
 
-
-   //copy from device to host   
-   cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);
-
-   //print
-   prtdat(NXPROB, NYPROB, u, "final.dat");
+   //copy from device to host
+   if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
+   else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
+   
+   prtdat(NXPROB, NYPROB, u, "final.dat");   //print
    cudaEventSynchronize(stop);
    cudaEventElapsedTime(&ms, start, stop);
-   printf("ms: %4.10f\n", ms);
+   printf("Time: %4.10f ms\n", ms);
 
    cudaFree(cuda_u0);
    cudaFree(cuda_u1);
