@@ -1,4 +1,5 @@
 #include "mpi.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -13,6 +14,9 @@
 #define NONE        -1                  /* indicates no neighbor */
 #define DONE        4                  /* message tag */
 #define MASTER      0                  /* taskid of first process */
+
+//omp
+#define THREADS 8
 
 //New Params
 #define LTAG        2                  /* message tag */
@@ -113,10 +117,10 @@ int BLOCK, checkboard;
 
       inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
-      char str[50];
-      sprintf(str, "%d", taskid);
-      strcat(str, "initial.dat");
-      prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      //char str[50];
+      //sprintf(str, "%d", taskid);
+      //strcat(str, "initial.dat");
+      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -198,8 +202,12 @@ int BLOCK, checkboard;
       checkboard=BLOCK+2;
       MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
+      #pragma omp parallel num_threads(THREADS) private(it)
+      {
       for (it = 1; it <= STEPS; it++)
       {
+        #pragma omp master
+        {
         //--------------------------------------------------------------
         //                Send-Receive
         //--------------------------------------------------------------
@@ -232,42 +240,47 @@ int BLOCK, checkboard;
         MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, MPI_COMM_WORLD, &Rdown_r);
         MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
 
-
+        }
         //--------------------------------------------------------------
         //                Calculate white spaces
         //--------------------------------------------------------------
-
+        #pragma omp barrier
         update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
+        #pragma omp master
+        {
 
           MPI_Wait(&Rleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rup_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Rdown_r, MPI_STATUS_IGNORE);
 
+        }
         //--------------------------------------------------------------
         //                Calculate for all
         //--------------------------------------------------------------
-
+        #pragma omp barrier
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
 
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
+        #pragma omp master
+        {
 
           MPI_Wait(&Sleft_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sright_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
-
           //--------------------------------------------------------------
           //                Next loop
-          //--------------------------------------------------------------
 
          iz = 1 - iz;
+        }
+      }
       }
       //--------------------------------------------------------------
       //               Loop ends here
@@ -284,9 +297,9 @@ int BLOCK, checkboard;
       //                Print data
       //--------------------------------------------------------------
 
-      sprintf(str, "%d", taskid);
-      strcat(str, "final.dat");
-      prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      //sprintf(str, "%d", taskid);
+      //strcat(str, "final.dat");
+      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
       if(taskid==MASTER)
         printf("Elapsed time (in seconds) : %f \n",reduced_time);
 
