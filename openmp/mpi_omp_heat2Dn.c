@@ -5,8 +5,8 @@
 #include <math.h>
 #include <string.h>
 
-#define NXPROB      2000                 /* x dimension of problem grid */
-#define NYPROB      2000                /* y dimension of problem grid */
+#define NXPROB      200                 /* x dimension of problem grid */
+#define NYPROB      200                /* y dimension of problem grid */
 #define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -53,6 +53,8 @@ int dims[ndims];
 int periods[ndims];
 int reorder;
 
+char *str;
+char *str_2;
 float *line[2];
 int left, right, up, down;       /* neighbor tasks */
 int start_h, end_h, start_v, end_v;
@@ -117,10 +119,11 @@ int BLOCK, checkboard;
 
       inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
-      //char str[50];
-      //sprintf(str, "%d", taskid);
-      //strcat(str, "initial.dat");
-      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      str=(char *)malloc(sizeof(char)*50);
+      snprintf(str,sizeof(str),"%d", taskid);
+      strncat(str, "initial.dat",sizeof(str)-10);
+      prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      free(str);
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -297,9 +300,11 @@ int BLOCK, checkboard;
       //                Print data
       //--------------------------------------------------------------
 
-      //sprintf(str, "%d", taskid);
-      //strcat(str, "final.dat");
-      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      str_2=(char *)malloc(sizeof(char)*50);
+      snprintf(str_2,sizeof(str_2),"%d", taskid);
+      strncat(str_2, "final.dat",sizeof(str_2)-10);
+      prtdat(BLOCK + 1, BLOCK + 1, u[0], str_2);
+      free(str_2);
       if(taskid==MASTER)
         printf("Elapsed time (in seconds) : %f \n",reduced_time);
 
