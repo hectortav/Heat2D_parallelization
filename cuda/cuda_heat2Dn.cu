@@ -28,7 +28,7 @@
 
 #define NXPROB      20                 /* x dimension of problem grid */
 #define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       10                /* number of time steps */
+#define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -98,7 +98,23 @@ fclose(fp);
 
 __global__ void cuda_update(float *u0, float *u1)
 {
-   printf("Hello\n");
+  int ix, iy;
+  ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
+  iy = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+  if (ix > 0 && iy > 0)
+  {
+    if (ix + iy < NXPROB + NYPROB - 2)
+    {
+      *(u1+ix*NYPROB+iy) = *(u0+ix*NYPROB+iy)  +
+                          0.1f * (*(u0+(ix+1)*NYPROB+iy) +
+                          *(u0+(ix-1)*NYPROB+iy) -
+                          2.0 * *(u0+ix*NYPROB+iy)) +
+                          0.1f * (*(u0+ix*NYPROB+iy+1) +
+                         *(u0+ix*NYPROB+iy-1) -
+                          2.0 * *(u0+ix*NYPROB+iy));
+    }
+  }
 }
 
 int main (int argc, char *argv[])
