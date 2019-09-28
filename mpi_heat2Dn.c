@@ -26,9 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      20                 /* x dimension of problem grid */
-#define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
+#define NXPROB      200                 /* x dimension of problem grid */
+#define NYPROB      200                 /* y dimension of problem grid */
+#define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -43,6 +43,7 @@ struct Parms {
   float cy;
 } parms = {0.1, 0.1};
 
+float reduced_time = 0.0;
 int main (int argc, char *argv[])
 {
 void inidat(), prtdat(), update();
@@ -57,6 +58,7 @@ int	taskid,                     /* this task's unique id */
 	rc,start,end,               /* misc */
 	i,ix,iy,iz,it;              /* loop variables */
 MPI_Status status;
+float start_t, end_t;
 
 
 /* First, find out my taskid and how many tasks are running */
@@ -118,18 +120,21 @@ MPI_Status status;
       {
          source = i;
          msgtype = DONE;
+         MPI_Recv(&start_t, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
          MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD,
                   &status);
          MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
          MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source,
                   msgtype, MPI_COMM_WORLD, &status);
+         end_t += start_t;
       }
 
+      printf("Time: %f ms\n", end_t);
       /* Write final output, call X graph and finalize MPI */
-      printf("Writing final.dat file and generating graph...\n");
+      //printf("Writing final.dat file and generating graph...\n");
       prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
-      printf("Click on MORE button to view initial/final states.\n");
-      printf("Click on EXIT button to quit program.\n");
+      //printf("Click on MORE button to view initial/final states.\n");
+      //printf("Click on EXIT button to quit program.\n");
 
       MPI_Finalize();
    }   /* End of master code */
@@ -172,6 +177,7 @@ MPI_Status status;
       /*  to  communicate with one neighbor  */
       printf("Task %d received work. Beginning time steps...\n",taskid);
       iz = 0;
+      start_t = MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
       {
          if (left != NONE)
@@ -192,12 +198,16 @@ MPI_Status status;
          update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
          iz = 1 - iz;
       }
+      end_t = MPI_Wtime();
+      end_t = end_t - start_t;
+      //MPI_Barrier(MPI_COMM_WORLD);
+      //MPI_Reduce(&end_t,&reduced_time,1,MPI_FLOAT,MPI_MAX,0,MPI_COMM_WORLD);
+      MPI_Send(&end_t, 1, MPI_FLOAT, MASTER, DONE, MPI_COMM_WORLD);
 
       /* Finally, send my portion of final results back to master */
       MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-      MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE,
-               MPI_COMM_WORLD);
+      MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Finalize();
    }
 }
@@ -228,8 +238,9 @@ int ix, iy;
 for (ix = 0; ix <= nx-1; ix++)
   for (iy = 0; iy <= ny-1; iy++)
      {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
-     if (*(u+ix*ny+iy) > 10000.0)
-     printf("%f\n", *(u+ix*ny+iy));}
+     //if (*(u+ix*ny+iy) > 10000.0)
+     //printf("%f\n", *(u+ix*ny+iy));
+     }
 }
 
 /**************************************************************************

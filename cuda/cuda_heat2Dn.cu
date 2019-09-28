@@ -26,8 +26,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      20                 /* x dimension of problem grid */
-#define NYPROB      20                 /* y dimension of problem grid */
+#define NXPROB      200                 /* x dimension of problem grid */
+#define NYPROB      200                 /* y dimension of problem grid */
 #define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -72,8 +72,9 @@ int ix, iy;
 for (ix = 0; ix <= nx-1; ix++)
   for (iy = 0; iy <= ny-1; iy++)
      {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
-     if (*(u+ix*ny+iy) > 10000.0)
-     printf("%f\n", *(u+ix*ny+iy));}
+     //if (*(u+ix*ny+iy) > 10000.0)
+     //printf("%f\n", *(u+ix*ny+iy));
+    }
 }
 
 /**************************************************************************
@@ -96,7 +97,7 @@ for (iy = ny-1; iy >= 0; iy--) {
 fclose(fp);
 }
 
-__global__ void cuda_update(float *u0, float *u1)
+__global__ void cuda_update(float *u0, float *u1, struct Parms parms)
 {
   int ix, iy;
   ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -107,10 +108,10 @@ __global__ void cuda_update(float *u0, float *u1)
     if (ix + iy < NXPROB + NYPROB - 2)
     {
       *(u1+ix*NYPROB+iy) = *(u0+ix*NYPROB+iy)  +
-                          0.1f * (*(u0+(ix+1)*NYPROB+iy) +
+                          parms.cx * (*(u0+(ix+1)*NYPROB+iy) +
                           *(u0+(ix-1)*NYPROB+iy) -
                           2.0 * *(u0+ix*NYPROB+iy)) +
-                          0.1f * (*(u0+ix*NYPROB+iy+1) +
+                          parms.cy * (*(u0+ix*NYPROB+iy+1) +
                          *(u0+ix*NYPROB+iy-1) -
                           2.0 * *(u0+ix*NYPROB+iy));
     }
@@ -146,18 +147,16 @@ int main (int argc, char *argv[])
 
    cudaEventRecord(start);
    for (i = 0; i < STEPS; i++)
-      if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1);}
-      else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0);}
+      if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1, parms);}
+      else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0, parms);}
    cudaEventRecord(stop);
-
    //copy from device to host
    if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
    else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
-   
-   prtdat(NXPROB, NYPROB, u, "final.dat");   //print
    cudaEventSynchronize(stop);
+   prtdat(NXPROB, NYPROB, u, "final.dat");   //print
    cudaEventElapsedTime(&ms, start, stop);
-   printf("Time: %4.10f ms\n", ms);
+   printf("Time: %f ms\n", ms);
 
    cudaFree(cuda_u0);
    cudaFree(cuda_u1);
