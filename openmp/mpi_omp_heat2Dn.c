@@ -5,8 +5,8 @@
 #include <math.h>
 #include <string.h>
 
-#define NXPROB      200                 /* x dimension of problem grid */
-#define NYPROB      200                /* y dimension of problem grid */
+#define NXPROB      20                 /* x dimension of problem grid */
+#define NYPROB      20                /* y dimension of problem grid */
 #define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -205,10 +205,12 @@ int BLOCK, checkboard;
       checkboard=BLOCK+2;
       MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
+      // parallel
       #pragma omp parallel num_threads(THREADS) private(it)
       {
       for (it = 1; it <= STEPS; it++)
       {
+        //only master thread makes MPI calls
         #pragma omp master
         {
         //--------------------------------------------------------------
@@ -247,12 +249,14 @@ int BLOCK, checkboard;
         //--------------------------------------------------------------
         //                Calculate white spaces
         //--------------------------------------------------------------
+        //wait for all the threads to reach this point
         #pragma omp barrier
         update_hv(start_h + 1, start_v + 1, end_h - 1, end_v - 1, checkboard, u[iz], u[1-iz]);
 
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
+        //only master thread makes MPI calls
         #pragma omp master
         {
 
@@ -265,12 +269,14 @@ int BLOCK, checkboard;
         //--------------------------------------------------------------
         //                Calculate for all
         //--------------------------------------------------------------
+        //wait for all the threads to reach this point
         #pragma omp barrier
         firstAndLast(checkboard, start_h, start_v, end_h, end_v, checkboard, u[iz], u[1-iz]);
 
         //--------------------------------------------------------------
         //                Wait for all
         //--------------------------------------------------------------
+        //only master thread makes MPI calls
         #pragma omp master
         {
 
@@ -407,7 +413,7 @@ for (ix = startx; ix < nx; ix++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
       if (u[ix][iy] != 0.0)
-        u[ix][iy] = 1.1;
+        u[ix][iy] = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
       /*if (taskid == 0)
       u[ix][iy] = ((float)ix+(float)((float)iy/100.0));
       else
