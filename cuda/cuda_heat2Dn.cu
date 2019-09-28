@@ -145,11 +145,11 @@ int main (int argc, char *argv[])
    cudaMemcpy(cuda_u0, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
    cudaMemcpy(cuda_u1, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
 
-   cudaEventRecord(start);
+   cudaEventRecord(start, 0);
    for (i = 0; i < STEPS; i++)
       if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1, parms);}
       else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0, parms);}
-   cudaEventRecord(stop);
+   cudaEventRecord(stop, 0);
    //copy from device to host
    if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
    else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
