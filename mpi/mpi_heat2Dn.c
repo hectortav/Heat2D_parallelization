@@ -22,10 +22,16 @@
 #define MAX_TEMP    500
 #define MIN_TEMP    10
 
+#define CHECK 0
+#define EVERY 50
+#define SENSITIVITY 0.8
+
 struct Parms {
   float cx;
   float cy;
 } parms = {0.1, 0.1};
+
+int check_sens(int block,float sens,float ***u);
 
 int main (int argc, char *argv[]){
 
@@ -48,6 +54,10 @@ int ndims;
 int dims[ndims];
 int periods[ndims];
 int reorder;
+
+//check
+int task_check=0;
+int reduced_check=0;
 
 char *str;
 char *str_2;
@@ -267,9 +277,22 @@ int BLOCK, checkboard;
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
 
           //--------------------------------------------------------------
-          //                Next loop
+          //                If check is enabled
           //--------------------------------------------------------------
 
+          if(CHECK==1){
+              if(it%EVERY==0){ //every EVERY steps
+                  task_check=check_sens(BLOCK,SENSITIVITY,u);
+                  MPI_Barrier(comm_cart);
+                  MPI_Allreduce(&task_check,&reduced_check,1,MPI_INT,MPI_LAND,comm_cart);
+                  if(reduced_check==1)
+                      it=STEPS+3; //end for loop
+              }
+          }
+
+          //--------------------------------------------------------------
+          //                Next loop
+          //--------------------------------------------------------------
          iz = 1 - iz;
       }
       //--------------------------------------------------------------
@@ -321,6 +344,16 @@ int BLOCK, checkboard;
 }
 
 
+//check for sensitivity if enabled
+int check_sens(int block,float sens,float ***u){
+  for(int ix=0;ix<block;ix++){
+    for(int iy=0;iy<block;iy++){
+      if(abs(u[0][ix][iy]-u[1][ix][iy])>sens)
+        return 0;
+    }
+  }
+    return 1;
+}
 
 /**************************************************************************
  *  subroutine update
@@ -348,12 +381,6 @@ void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u
    for (ix = start_h; ix <= end_h; ix++)
       for (iy = start_v; iy <= end_v; iy++)
       {
-       /* printf("ix: %d iy: %d\n", ix, iy);
-        printf("u1[ix][iy]: %6.1f\n", u1[ix][iy]);
-        printf("u1[ix-1][iy]: %6.1f\n", u1[ix-1][iy]);
-        printf("u1[ix+1][iy]: %6.1f\n", u1[ix+1][iy]);
-        printf("u1[ix][iy-1]: %6.1f\n", u1[ix][iy-1]);
-        printf("u1[ix][iy+1]: %6.1f\n", u1[ix][iy+1]);*/
 
         u2[ix][iy] = u1[ix][iy] +
                           parms.cx * (u1[ix+1][iy] +
@@ -395,11 +422,7 @@ for (ix = startx; ix < nx; ix++)
     {
       u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
       if (u[ix][iy] != 0.0)
-        u[ix][iy] = 1.1;
-      /*if (taskid == 0)
-      u[ix][iy] = ((float)ix+(float)((float)iy/100.0));
-      else
-      u[ix][iy] = (float)taskid;*/
+        u[ix][iy] = (float)((ix * (nx - ix - 1) * iy * (ny - iy - 1)));
 
     }
 //every block will have 0.0 at each border. 0.0 will be kept the same for blocks with no neighbors
