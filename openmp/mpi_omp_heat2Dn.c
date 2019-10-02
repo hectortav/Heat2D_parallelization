@@ -6,8 +6,8 @@
 #include <string.h>
 
 
-#define NXPROB      200                /* x dimension of problem grid */
-#define NYPROB      200             /* y dimension of problem grid */
+#define NXPROB      80                /* x dimension of problem grid */
+#define NYPROB      164             /* y dimension of problem grid */
 #define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
@@ -17,7 +17,7 @@
 #define MASTER      0                  /* taskid of first process */
 
 //omp
-#define THREADS 8
+#define THREADS 4
 
 //New Params
 #define LTAG        2                  /* message tag */
@@ -374,7 +374,7 @@ int check_sens(int block,float sens,float ***u){
 
 
 /**************************************************************************
- *  subroutine update
+ *  subroutine update not used
  ****************************************************************************/
 void update(int start, int end, int ny, float *u1, float *u2)
 {
@@ -396,7 +396,9 @@ void update(int start, int end, int ny, float *u1, float *u2)
 void update_hv(int start_h, int start_v, int end_h, int end_v, int ny, float **u1, float **u2)
 {
    int ix, iy;
+   #pragma parallel omp for schedule(dynamic,1)
    for (ix = start_h; ix <= end_h; ix++)
+      #pragma parallel omp for schedule(dynamic,1)
       for (iy = start_v; iy <= end_v; iy++)
       {
         u2[ix][iy] = u1[ix][iy] +
