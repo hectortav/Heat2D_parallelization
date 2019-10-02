@@ -6,9 +6,9 @@
 #include <string.h>
 
 
-#define NXPROB      200                 /* x dimension of problem grid */
-#define NYPROB      200               /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
+#define NXPROB      200                /* x dimension of problem grid */
+#define NYPROB      200             /* y dimension of problem grid */
+#define STEPS       1000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -27,7 +27,7 @@
 #define MAX_TEMP    500
 #define MIN_TEMP    10
 
-#define CHECK 0
+#define CHECK 1
 #define EVERY 50
 #define SENSITIVITY 0.8
 
@@ -202,7 +202,7 @@ int BLOCK, checkboard;
       //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
       MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
       MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
-      printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
+      //printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
       iz = 0;
       if (left <= NONE)  left = MPI_PROC_NULL;
       if (right <= NONE)  right = MPI_PROC_NULL;
@@ -296,7 +296,6 @@ int BLOCK, checkboard;
           MPI_Wait(&Sup_r, MPI_STATUS_IGNORE);
           MPI_Wait(&Sdown_r, MPI_STATUS_IGNORE);
          iz = 1 - iz;
-        }
 
         //--------------------------------------------------------------
         //                If check is enabled
@@ -311,6 +310,7 @@ int BLOCK, checkboard;
                     it=STEPS+3; //end for loop
             }
         }
+      } //omp master
         //next loop
       }
       }
@@ -357,7 +357,7 @@ int BLOCK, checkboard;
       //--------------------------------------------------------------
       //                End of each task
       //--------------------------------------------------------------
-      printf("- MPI_Finalize task id %d -\n", taskid);
+      //printf("- MPI_Finalize task id %d -\n", taskid);
       MPI_Finalize();
 }
 
