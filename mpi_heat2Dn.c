@@ -1,17 +1,17 @@
 /****************************************************************************
  * FILE: mpi_heat2D.c
- * DESCRIPTIONS:
+ * DESCRIPTIONS:  
  *   HEAT2D Example - Parallelized C Version
- *   This example is based on a simplified two-dimensional heat
- *   equation domain decomposition.  The initial temperature is computed to be
- *   high in the middle of the domain and zero at the boundaries.  The
- *   boundaries are held at zero throughout the simulation.  During the
- *   time-stepping, an array containing two domains is used; these domains
+ *   This example is based on a simplified two-dimensional heat 
+ *   equation domain decomposition.  The initial temperature is computed to be 
+ *   high in the middle of the domain and zero at the boundaries.  The 
+ *   boundaries are held at zero throughout the simulation.  During the 
+ *   time-stepping, an array containing two domains is used; these domains 
  *   alternate between old data and new data.
  *
  *   In this parallelized version, the grid is decomposed by the master
- *   process and then distributed by rows to the worker processes.  At each
- *   time step, worker processes must exchange border data with neighbors,
+ *   process and then distributed by rows to the worker processes.  At each 
+ *   time step, worker processes must exchange border data with neighbors, 
  *   because a grid point's current temperature depends upon it's previous
  *   time step value plus the values of the neighboring grid points.  Upon
  *   completion of all time steps, the worker processes return their results
@@ -26,9 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      200                 /* x dimension of problem grid */
-#define NYPROB      200                 /* y dimension of problem grid */
-#define STEPS       1000                /* number of time steps */
+#define NXPROB      20                 /* x dimension of problem grid */
+#define NYPROB      20                 /* y dimension of problem grid */
+#define STEPS       100                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -38,12 +38,11 @@
 #define DONE        4                  /* message tag */
 #define MASTER      0                  /* taskid of first process */
 
-struct Parms {
+struct Parms { 
   float cx;
   float cy;
 } parms = {0.1, 0.1};
 
-float reduced_time = 0.0;
 int main (int argc, char *argv[])
 {
 void inidat(), prtdat(), update();
@@ -58,7 +57,6 @@ int	taskid,                     /* this task's unique id */
 	rc,start,end,               /* misc */
 	i,ix,iy,iz,it;              /* loop variables */
 MPI_Status status;
-float start_t, end_t;
 
 
 /* First, find out my taskid and how many tasks are running */
@@ -71,8 +69,8 @@ float start_t, end_t;
       /************************* master code *******************************/
       /* Check if numworkers is within range - quit if not */
       if ((numworkers > MAXWORKER) || (numworkers < MINWORKER)) {
-         printf("ERROR: the number of tasks must be between %d and %d.(%d)\n",
-                 MINWORKER+1, MAXWORKER+1, numworkers);
+         printf("ERROR: the number of tasks must be between %d and %d.\n",
+                 MINWORKER+1,MAXWORKER+1);
          printf("Quitting...\n");
          MPI_Abort(MPI_COMM_WORLD, rc);
          exit(1);
@@ -92,10 +90,10 @@ float start_t, end_t;
       offset = 0;
       for (i=1; i<=numworkers; i++)
       {
-         rows = (i <= extra) ? averow+1 : averow;
+         rows = (i <= extra) ? averow+1 : averow; 
          /* Tell each worker who its neighbors are, since they must exchange */
-         /* data with each other. */
-         if (i == 1)
+         /* data with each other. */  
+         if (i == 1) 
             left = NONE;
          else
             left = i - 1;
@@ -109,7 +107,7 @@ float start_t, end_t;
          MPI_Send(&rows, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&left, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
          MPI_Send(&right, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-         MPI_Send(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, dest, BEGIN,
+         MPI_Send(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, dest, BEGIN, 
                   MPI_COMM_WORLD);
          printf("Sent to task %d: rows= %d offset= %d ",dest,rows,offset);
          printf("left= %d right= %d\n",left,right);
@@ -120,34 +118,31 @@ float start_t, end_t;
       {
          source = i;
          msgtype = DONE;
-         MPI_Recv(&start_t, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-         MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD,
+         MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, 
                   &status);
          MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
          MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source,
                   msgtype, MPI_COMM_WORLD, &status);
-         end_t += start_t;
       }
 
-      printf("Time: %f ms\n", end_t);
       /* Write final output, call X graph and finalize MPI */
-      //printf("Writing final.dat file and generating graph...\n");
+      printf("Writing final.dat file and generating graph...\n");
       prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
-      //printf("Click on MORE button to view initial/final states.\n");
-      //printf("Click on EXIT button to quit program.\n");
-
+      printf("Click on MORE button to view initial/final states.\n");
+      printf("Click on EXIT button to quit program.\n");
+      
       MPI_Finalize();
    }   /* End of master code */
 
 
 
    /************************* workers code **********************************/
-   if (taskid != MASTER)
+   if (taskid != MASTER) 
    {
       /* Initialize everything - including the borders - to zero */
       for (iz=0; iz<2; iz++)
-         for (ix=0; ix<NXPROB; ix++)
-            for (iy=0; iy<NYPROB; iy++)
+         for (ix=0; ix<NXPROB; ix++) 
+            for (iy=0; iy<NYPROB; iy++) 
                u[iz][ix][iy] = 0.0;
 
       /* Receive my offset, rows, neighbors and grid partition from master */
@@ -157,19 +152,19 @@ float start_t, end_t;
       MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&left, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&right, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-      MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source, msgtype,
+      MPI_Recv(&u[0][offset][0], rows*NYPROB, MPI_FLOAT, source, msgtype, 
                MPI_COMM_WORLD, &status);
 
       /* Determine border elements.  Need to consider first and last columns. */
       /* Obviously, row 0 can't exchange with row 0-1.  Likewise, the last */
       /* row can't exchange with last+1.  */
-      if (offset==0)
+      if (offset==0) 
          start=1;
-      else
+      else 
          start=offset;
-      if ((offset+rows)==NXPROB)
+      if ((offset+rows)==NXPROB) 
          end=start+rows-2;
-      else
+      else 
          end = start+rows-1;
 
       /* Begin doing STEPS iterations.  Must communicate border rows with */
@@ -177,7 +172,6 @@ float start_t, end_t;
       /*  to  communicate with one neighbor  */
       printf("Task %d received work. Beginning time steps...\n",taskid);
       iz = 0;
-      start_t = MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
       {
          if (left != NONE)
@@ -198,16 +192,12 @@ float start_t, end_t;
          update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
          iz = 1 - iz;
       }
-      end_t = MPI_Wtime();
-      end_t = end_t - start_t;
-      //MPI_Barrier(MPI_COMM_WORLD);
-      //MPI_Reduce(&end_t,&reduced_time,1,MPI_FLOAT,MPI_MAX,0,MPI_COMM_WORLD);
-      MPI_Send(&end_t, 1, MPI_FLOAT, MASTER, DONE, MPI_COMM_WORLD);
-
+      
       /* Finally, send my portion of final results back to master */
       MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-      MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE, MPI_COMM_WORLD);
+      MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE, 
+               MPI_COMM_WORLD);
       MPI_Finalize();
    }
 }
@@ -219,14 +209,14 @@ float start_t, end_t;
 void update(int start, int end, int ny, float *u1, float *u2)
 {
    int ix, iy;
-   for (ix = start; ix <= end; ix++)
-      for (iy = 1; iy <= ny-2; iy++)
-         *(u2+ix*ny+iy) = *(u1+ix*ny+iy)  +
+   for (ix = start; ix <= end; ix++) 
+      for (iy = 1; iy <= ny-2; iy++) 
+         *(u2+ix*ny+iy) = *(u1+ix*ny+iy)  + 
                           parms.cx * (*(u1+(ix+1)*ny+iy) +
-                          *(u1+(ix-1)*ny+iy) -
+                          *(u1+(ix-1)*ny+iy) - 
                           2.0 * *(u1+ix*ny+iy)) +
                           parms.cy * (*(u1+ix*ny+iy+1) +
-                         *(u1+ix*ny+iy-1) -
+                         *(u1+ix*ny+iy-1) - 
                           2.0 * *(u1+ix*ny+iy));
 }
 
@@ -235,12 +225,10 @@ void update(int start, int end, int ny, float *u1, float *u2)
  *****************************************************************************/
 void inidat(int nx, int ny, float *u) {
 int ix, iy;
-for (ix = 0; ix <= nx-1; ix++)
+
+for (ix = 0; ix <= nx-1; ix++) 
   for (iy = 0; iy <= ny-1; iy++)
-     {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
-     //if (*(u+ix*ny+iy) > 10000.0)
-     //printf("%f\n", *(u+ix*ny+iy));
-     }
+     *(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
 }
 
 /**************************************************************************
@@ -254,7 +242,7 @@ fp = fopen(fnam, "w");
 for (iy = ny-1; iy >= 0; iy--) {
   for (ix = 0; ix <= nx-1; ix++) {
     fprintf(fp, "%6.1f", *(u1+ix*ny+iy));
-    if (ix != nx-1)
+    if (ix != nx-1) 
       fprintf(fp, " ");
     else
       fprintf(fp, "\n");
