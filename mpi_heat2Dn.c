@@ -26,11 +26,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      20                 /* x dimension of problem grid */
-#define NYPROB      20                 /* y dimension of problem grid */
-#define STEPS       100                /* number of time steps */
-#define MAXWORKER   8                  /* maximum number of worker tasks */
-#define MINWORKER   3                  /* minimum number of worker tasks */
+#define NXPROB      900                 /* x dimension of problem grid */
+#define NYPROB      900                 /* y dimension of problem grid */
+#define STEPS       10000                /* number of time steps */
+#define MAXWORKER   170                  /* maximum number of worker tasks */
+#define MINWORKER   1                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
 #define LTAG        2                  /* message tag */
 #define RTAG        3                  /* message tag */
@@ -57,6 +57,7 @@ int	taskid,                     /* this task's unique id */
 	rc,start,end,               /* misc */
 	i,ix,iy,iz,it;              /* loop variables */
 MPI_Status status;
+float start_time = 0.0, end_time = 0.0;
 
 
 /* First, find out my taskid and how many tasks are running */
@@ -68,6 +69,7 @@ MPI_Status status;
    if (taskid == MASTER) {
       /************************* master code *******************************/
       /* Check if numworkers is within range - quit if not */
+      printf("%d\n", numworkers);
       if ((numworkers > MAXWORKER) || (numworkers < MINWORKER)) {
          printf("ERROR: the number of tasks must be between %d and %d.\n",
                  MINWORKER+1,MAXWORKER+1);
@@ -78,10 +80,10 @@ MPI_Status status;
       printf ("Starting mpi_heat2D with %d worker tasks.\n", numworkers);
 
       /* Initialize grid */
-      printf("Grid size: X= %d  Y= %d  Time steps= %d\n",NXPROB,NYPROB,STEPS);
+      printf("%d: Grid size: X= %d  Y= %d  Time steps= %d\n",numtasks - 1,NXPROB,NYPROB,STEPS);
       printf("Initializing grid and writing initial.dat file...\n");
       inidat(NXPROB, NYPROB, u);
-      prtdat(NXPROB, NYPROB, u, "initial.dat");
+      //prtdat(NXPROB, NYPROB, u, "initial.dat");
 
       /* Distribute work to workers.  Must first figure out how many rows to */
       /* send and what to do with extra rows.  */
@@ -114,10 +116,15 @@ MPI_Status status;
          offset = offset + rows;
       }
       /* Now wait for results from all worker tasks */
+      end_time = 0.0;
       for (i=1; i<=numworkers; i++)
       {
          source = i;
          msgtype = DONE;
+         MPI_Recv(&start_time, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, 
+                  &status);
+         if (start_time >= end_time)
+            end_time = start_time;
          MPI_Recv(&offset, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, 
                   &status);
          MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
@@ -125,9 +132,11 @@ MPI_Status status;
                   msgtype, MPI_COMM_WORLD, &status);
       }
 
+
       /* Write final output, call X graph and finalize MPI */
-      printf("Writing final.dat file and generating graph...\n");
-      prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
+      //printf("Writing final.dat file and generating graph...\n");
+      //prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
+      printf("Time: %6.1f\n", end_time);
       printf("Click on MORE button to view initial/final states.\n");
       printf("Click on EXIT button to quit program.\n");
       
@@ -172,6 +181,7 @@ MPI_Status status;
       /*  to  communicate with one neighbor  */
       printf("Task %d received work. Beginning time steps...\n",taskid);
       iz = 0;
+      start_time=MPI_Wtime();
       for (it = 1; it <= STEPS; it++)
       {
          if (left != NONE)
@@ -192,8 +202,10 @@ MPI_Status status;
          update(start,end,NYPROB,&u[iz][0][0],&u[1-iz][0][0]);
          iz = 1 - iz;
       }
-      
+      end_time=MPI_Wtime();
+      end_time = end_time - start_time;
       /* Finally, send my portion of final results back to master */
+      MPI_Send(&end_time, 1, MPI_FLOAT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
       MPI_Send(&u[iz][offset][0], rows*NYPROB, MPI_FLOAT, MASTER, DONE, 

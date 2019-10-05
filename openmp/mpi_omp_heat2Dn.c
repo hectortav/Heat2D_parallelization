@@ -1,4 +1,5 @@
 #include "mpi.h"
+#include <omp.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +18,7 @@
 #define MASTER      0                  /* taskid of first process */
 
 //omp
-#define THREADS 4
+//#define THREADS _IO_NO_READS//OMP_NUM_THREADS 
 
 //New Params
 #define LTAG        2                  /* message tag */
@@ -90,7 +91,7 @@ int BLOCK, checkboard;
     // Calculate number of tasks in each row
     //--------------------------------------------------------------
     row=(int)sqrt(numtasks);
-    if(sqrt(numtasks)!=floor(sqrt(numtasks))){
+    if((NXPROB * NYPROB)%numtasks != 0) {//sqrt(numtasks)!=floor(sqrt(numtasks))){
       printf("We must have an equal number of blocks(ex 3x3,4x4)\n");
       MPI_Abort(MPI_COMM_WORLD,rc);
       exit(1);
@@ -127,13 +128,14 @@ int BLOCK, checkboard;
       //--------------------------------------------------------------
       // Initialize block to random values
       //--------------------------------------------------------------
-
+      if (taskid == 0)
+        printf("%d: Grid size: X= %d  Y= %d  Time steps= %d\n",numtasks,NXPROB,NYPROB,STEPS);
       inidat_block(BLOCK+2,BLOCK+2,u[0], taskid, numtasks);
 
       str=(char *)malloc(sizeof(char)*50);
       snprintf(str,sizeof(str),"%d", taskid);
       strncat(str, "initial.dat",sizeof(str)-10);
-      prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
+      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str);
       free(str);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -200,8 +202,12 @@ int BLOCK, checkboard;
       //                Cartesian communicator
       //--------------------------------------------------------------
       //http://mpi.deino.net/mpi_functions/MPI_Cart_shift.html
-      MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
-      MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
+      if (comm_cart != MPI_COMM_NULL)
+      {
+        MPI_Cart_shift(comm_cart, 0, 1, &up, &down);
+        MPI_Cart_shift(comm_cart, 1, 1, &left, &right);
+      }
+      
       //printf("for %d task id: UP=%d DOWN=%d LEFT=%d RIGHT=%d\n",taskid,up,down,left,right);
       iz = 0;
       if (left <= NONE)  left = MPI_PROC_NULL;
@@ -214,10 +220,12 @@ int BLOCK, checkboard;
       //                for loop
       //--------------------------------------------------------------
       checkboard=BLOCK+2;
-      MPI_Barrier(comm_cart);
+      if (comm_cart != MPI_COMM_NULL)
+        MPI_Barrier(comm_cart);
       start_time=MPI_Wtime();
       // parallel
-      #pragma omp parallel num_threads(THREADS) private(it)
+      if (comm_cart != MPI_COMM_NULL)
+      #pragma omp parallel //num_threads(THREADS) private(it)
       {
       for (it = 1; it <= STEPS; it++)
       {
@@ -246,15 +254,15 @@ int BLOCK, checkboard;
         //                up
         //--------------------------------------------------------------
 
-        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, MPI_COMM_WORLD, &Rup_r);
-        MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, MPI_COMM_WORLD, &Sup_r);
+        MPI_Irecv(&u[iz][0][0], 1, MPI_row, up, UTAG, comm_cart, &Rup_r);
+        MPI_Isend(&u[iz][1][0], 1, MPI_row, up, DTAG, comm_cart, &Sup_r);
 
         //--------------------------------------------------------------
         //                down
         //--------------------------------------------------------------
 
-        MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, MPI_COMM_WORLD, &Rdown_r);
-        MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, MPI_COMM_WORLD, &Sdown_r);
+        MPI_Irecv(&u[iz][BLOCK+1][0], 1, MPI_row, down, DTAG, comm_cart, &Rdown_r);
+        MPI_Isend(&u[iz][BLOCK][0], 1, MPI_row, down, UTAG, comm_cart, &Sdown_r);
 
         }
         //--------------------------------------------------------------
@@ -323,8 +331,10 @@ int BLOCK, checkboard;
 
       end_time=MPI_Wtime();
       task_time = end_time - start_time;
-      MPI_Barrier(comm_cart);
-      MPI_Reduce(&task_time,&reduced_time,1,MPI_DOUBLE,MPI_MAX,0,comm_cart);
+      if (comm_cart != MPI_COMM_NULL)
+        MPI_Barrier(comm_cart);
+      if (comm_cart != MPI_COMM_NULL)
+        MPI_Reduce(&task_time,&reduced_time,1,MPI_DOUBLE,MPI_MAX,0,comm_cart);
       //--------------------------------------------------------------
       //                Print data
       //--------------------------------------------------------------
@@ -332,7 +342,7 @@ int BLOCK, checkboard;
       str_2=(char *)malloc(sizeof(char)*50);
       snprintf(str_2,sizeof(str_2),"%d", taskid);
       strncat(str_2, "final.dat",sizeof(str_2)-10);
-      prtdat(BLOCK + 1, BLOCK + 1, u[0], str_2);
+      //prtdat(BLOCK + 1, BLOCK + 1, u[0], str_2);
       free(str_2);
       if(taskid==MASTER)
         printf("Elapsed time (in seconds) : %f \n",reduced_time);

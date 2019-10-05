@@ -1,0 +1,24 @@
+--------------------------------------------------------------------------
+ORTE has lost communication with a remote daemon.
+
+  HNP daemon   : [[14782,0],0] on node wn032
+  Remote daemon: [[14782,0],3] on node wn035
+
+This is usually due to either a failure of the TCP network
+connection to the node, or possibly an internal failure of
+the daemon itself. We cannot recover from this failure, and
+therefore will terminate the job.
+--------------------------------------------------------------------------
+[wn032:19343] *** Process received signal ***
+[wn032:19343] Signal: Segmentation fault (11)
+[wn032:19343] Signal code: Address not mapped (1)
+[wn032:19343] Failing at address: 0x28
+[wn032:19343] [ 0] /lib64/libpthread.so.0[0x317a80f7e0]
+[wn032:19343] [ 1] /fhgfs/rbs/apps/openmpi/3.0.0/lib/openmpi/mca_pmix_pmix2x.so(+0x9d539)[0x7f0c4c9ee539]
+[wn032:19343] [ 2] /fhgfs/rbs/apps/openmpi/3.0.0/lib/openmpi/mca_pmix_pmix2x.so(pmix_ptl_base_recv_handler+0x17c)[0x7f0c4c9ef24c]
+[wn032:19343] [ 3] /fhgfs/rbs/apps/openmpi/3.0.0/lib/libopen-pal.so.40(opal_libevent2022_event_base_loop+0x805)[0x7f0c51b1da05]
+[wn032:19343] [ 4] /fhgfs/rbs/apps/openmpi/3.0.0/lib/openmpi/mca_pmix_pmix2x.so(+0x8ba8e)[0x7f0c4c9dca8e]
+[wn032:19343] [ 5] /lib64/libpthread.so.0[0x317a807aa1]
+[wn032:19343] [ 6] /lib64/libc.so.6(clone+0x6d)[0x317a4e8bcd]
+[wn032:19343] *** End of error message ***
+/var/lib/torque/mom_priv/jobs/8281609.cream-ce01.marie.hellasgrid.gr.SC: line 31: 19343 Segmentation fault      mpirun mpi_heat2Dn.x

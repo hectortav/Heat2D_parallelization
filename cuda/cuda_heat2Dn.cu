@@ -26,9 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      200                 /* x dimension of problem grid */
-#define NYPROB      200                 /* y dimension of problem grid */
-#define STEPS       1000                /* number of time steps */
+#define NXPROB      900                 /* x dimension of problem grid */
+#define NYPROB      900                 /* y dimension of problem grid */
+#define STEPS       10000                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -120,49 +120,50 @@ __global__ void cuda_update(float *u0, float *u1, struct Parms parms)
 
 int main (int argc, char *argv[])
 {
-   int i;
-   float *u;
-   float *cuda_u0, *cuda_u1;
-   cudaEvent_t start, stop;
-   cudaEventCreate(&start);
-   cudaEventCreate(&stop);
-   float ms = 0.0;
+  int i;
+  float *u;
+  float *cuda_u0, *cuda_u1;
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  float ms = 0.0;
 
-   dim3 dimBlocks(BLOCK_H, BLOCK_V);
-   dim3 dimThreads((NXPROB / BLOCK_H) + ((NXPROB % BLOCK_H) != 0), (NYPROB / BLOCK_V) + ((NYPROB % BLOCK_V) != 0));
+  dim3 dimBlocks(BLOCK_H, BLOCK_V);
+  dim3 dimThreads((NXPROB / BLOCK_H) + ((NXPROB % BLOCK_H) != 0), (NYPROB / BLOCK_V) + ((NYPROB % BLOCK_V) != 0));
 
-   //malloc host 
-   u = (float*)malloc(NXPROB*NYPROB*sizeof(float));
+  //malloc host 
+  u = (float*)malloc(NXPROB*NYPROB*sizeof(float));
 
-   //malloc device
-   cudaMalloc((void**)&cuda_u0, (NXPROB*NYPROB*sizeof(float)));
-   cudaMalloc((void**)&cuda_u1, (NXPROB*NYPROB*sizeof(float)));
+  //malloc device
+  cudaMalloc((void**)&cuda_u0, (NXPROB*NYPROB*sizeof(float)));
+  cudaMalloc((void**)&cuda_u1, (NXPROB*NYPROB*sizeof(float)));
 
-   inidat(NXPROB, NYPROB, u); //initialize
-   prtdat(NXPROB, NYPROB, u, "initial.dat"); //print
+  printf("Grid size: X= %d  Y= %d  Time steps= %d\n",NXPROB,NYPROB,STEPS);
+  inidat(NXPROB, NYPROB, u); //initialize
+  //prtdat(NXPROB, NYPROB, u, "initial.dat"); //print
 
-   //copy from host to device
-   cudaMemcpy(cuda_u0, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
-   cudaMemcpy(cuda_u1, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
+  //copy from host to device
+  cudaMemcpy(cuda_u0, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
+  cudaMemcpy(cuda_u1, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
 
-   cudaEventRecord(start, 0);
-   for (i = 0; i < STEPS; i++)
-      if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1, parms);}
-      else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0, parms);}
-   cudaEventRecord(stop, 0);
-   //copy from device to host
-   if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
-   else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
-   cudaEventSynchronize(stop);
-   prtdat(NXPROB, NYPROB, u, "final.dat");   //print
-   cudaEventElapsedTime(&ms, start, stop);
-   printf("Time: %f ms\n", ms);
+  cudaEventRecord(start, 0);
+  for (i = 0; i < STEPS; i++)
+    if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1, parms);}
+    else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0, parms);}
+  cudaEventRecord(stop, 0);
+  //copy from device to host
+  if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
+  else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
+  cudaEventSynchronize(stop);
+  //prtdat(NXPROB, NYPROB, u, "final.dat");   //print
+  cudaEventElapsedTime(&ms, start, stop);
+  printf("Time: %f ms\n", ms);
+  
+  cudaFree(cuda_u0);
+  cudaFree(cuda_u1);
+  free(u);
+  cudaEventDestroy(start);
+  cudaEventDestroy(stop);
 
-   cudaFree(cuda_u0);
-   cudaFree(cuda_u1);
-   free(u);
-   cudaEventDestroy(start);
-   cudaEventDestroy(stop);
-
-   return 0;
+  return 0;
 }
