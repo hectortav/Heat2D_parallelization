@@ -1,0 +1,34 @@
+[wn018][[50949,1],15][btl_tcp_frag.c:137:mca_btl_tcp_frag_send] mca_btl_tcp_frag_send: writev failed: Connection reset by peer (104)[wn020][[50949,1],31][btl_tcp_frag.c:137:mca_btl_tcp_frag_send] --------------------------------------------------------------------------
+ORTE has lost communication with a remote daemon.
+
+  HNP daemon   : [[50949,0],0] on node wn017
+  Remote daemon: [[50949,0],2] on node wn019
+
+This is usually due to either a failure of the TCP network
+connection to the node, or possibly an internal failure of
+the daemon itself. We cannot recover from this failure, and
+therefore will terminate the job.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+An MPI communication peer process has unexpectedly disconnected.  This
+usually indicates a failure in the peer process (e.g., a crash or
+otherwise exiting without calling MPI_FINALIZE first).
+
+Although this local MPI process will likely now behave unpredictably
+(it may even hang or crash), the root cause of this problem is the
+failure of the peer -- that is what you need to investigate.  For
+example, there may be a core file that you can examine.  More
+generally: such peer hangups are frequently caused by application bugs
+or other external events.
+
+  Local host: wn020
+  Local PID:  25748
+  Peer host:  wn019
+--------------------------------------------------------------------------
+
+mca_btl_tcp_frag_send: writev failed: Connection reset by peer (104)
+[wn020][[50949,1],24][btl_tcp_frag.c:137:mca_btl_tcp_frag_send] mca_btl_tcp_frag_send: writev failed: Connection reset by peer (104)
+[wn020][[50949,1],26][btl_tcp_endpoint.c:796:mca_btl_tcp_endpoint_complete_connect] connect() to 195.251.54.29 failed: Connection refused (111)
+[wn018][[50949,1],10][btl_tcp_endpoint.c:796:mca_btl_tcp_endpoint_complete_connect] connect() to 195.251.54.29 failed: Connection refused (111)
+[wn017.marie.hellasgrid.gr:08414] 6 more processes have sent help message help-mpi-btl-tcp.txt / peer hung up
+[wn017.marie.hellasgrid.gr:08414] Set MCA parameter "orte_base_help_aggregate" to 0 to see all help / error messages

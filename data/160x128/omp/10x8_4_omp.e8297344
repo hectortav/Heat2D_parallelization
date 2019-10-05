@@ -1,0 +1,14 @@
+--------------------------------------------------------------------------
+ORTE has lost communication with a remote daemon.
+
+  HNP daemon   : [[51065,0],0] on node wn007
+  Remote daemon: [[51065,0],8] on node wn024
+
+This is usually due to either a failure of the TCP network
+connection to the node, or possibly an internal failure of
+the daemon itself. We cannot recover from this failure, and
+therefore will terminate the job.
+--------------------------------------------------------------------------
+mpirun: abort is already in progress...hit ctrl-c again to forcibly terminate
+
+=>> PBS: job killed: vmem 3374432256 exceeded limit 2147483648

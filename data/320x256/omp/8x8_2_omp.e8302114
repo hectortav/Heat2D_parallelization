@@ -1,0 +1,12 @@
+--------------------------------------------------------------------------
+ORTE has lost communication with a remote daemon.
+
+  HNP daemon   : [[13411,0],0] on node wn041
+  Remote daemon: [[13411,0],1] on node wn042
+
+This is usually due to either a failure of the TCP network
+connection to the node, or possibly an internal failure of
+the daemon itself. We cannot recover from this failure, and
+therefore will terminate the job.
+--------------------------------------------------------------------------
+[warn] Epoll MOD(1) on fd 21 failed.  Old events were 6; read change was 0 (none); write change was 2 (d
