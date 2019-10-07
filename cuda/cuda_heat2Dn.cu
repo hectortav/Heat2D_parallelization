@@ -1,34 +1,10 @@
-/****************************************************************************
- * FILE: mpi_heat2D.c
- * DESCRIPTIONS:
- *   HEAT2D Example - Parallelized C Version
- *   This example is based on a simplified two-dimensional heat
- *   equation domain decomposition.  The initial temperature is computed to be
- *   high in the middle of the domain and zero at the boundaries.  The
- *   boundaries are held at zero throughout the simulation.  During the
- *   time-stepping, an array containing two domains is used; these domains
- *   alternate between old data and new data.
- *
- *   In this parallelized version, the grid is decomposed by the master
- *   process and then distributed by rows to the worker processes.  At each
- *   time step, worker processes must exchange border data with neighbors,
- *   because a grid point's current temperature depends upon it's previous
- *   time step value plus the values of the neighboring grid points.  Upon
- *   completion of all time steps, the worker processes return their results
- *   to the master process.
- *
- *   Two data files are produced: an initial data set and a final data set.
- * AUTHOR: Blaise Barney - adapted from D. Turner's serial C version. Converted
- *   to MPI: George L. Gusciora (1/95)
- * LAST REVISED: 04/02/05
- ****************************************************************************/
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NXPROB      900                 /* x dimension of problem grid */
-#define NYPROB      900                 /* y dimension of problem grid */
-#define STEPS       10000                /* number of time steps */
+#define NXPROB      20480                /* x dimension of problem grid */
+#define NYPROB      32768                  /* y dimension of problem grid */
+#define STEPS       500                /* number of time steps */
 #define MAXWORKER   8                  /* maximum number of worker tasks */
 #define MINWORKER   3                  /* minimum number of worker tasks */
 #define BEGIN       1                  /* message tag */
@@ -38,8 +14,8 @@
 #define DONE        4                  /* message tag */
 #define MASTER      0                  /* taskid of first process */
 
-#define BLOCK_H   5
-#define BLOCK_V   5
+#define BLOCK_H   10
+#define BLOCK_V   8
 #define THREADS   32
 
 struct Parms {
@@ -71,7 +47,7 @@ void inidat(int nx, int ny, float *u) {
 int ix, iy;
 for (ix = 0; ix <= nx-1; ix++)
   for (iy = 0; iy <= ny-1; iy++)
-     {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1));
+     {*(u+ix*ny+iy) = (float)(ix * (nx - ix - 1) * iy * (ny - iy - 1)%1000);
      //if (*(u+ix*ny+iy) > 10000.0)
      //printf("%f\n", *(u+ix*ny+iy));
     }
@@ -118,6 +94,15 @@ __global__ void cuda_update(float *u0, float *u1, struct Parms parms)
   }
 }
 
+__global__ void MyKernel(int *a, int *b, int *c, int N) 
+{ 
+  int idx = threadIdx.x + blockIdx.x * blockDim.x; 
+  if (idx < N) 
+  {
+    c[idx] = a[idx] + b[idx];
+  } 
+} 
+
 int main (int argc, char *argv[])
 {
   int i;
@@ -126,8 +111,13 @@ int main (int argc, char *argv[])
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-  float ms = 0.0;
-
+  float ms = 0.0f;
+  int block_size;
+  int min_grid, grid;
+  
+  //http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-occupancy-api-simplifies-launch-configuration/
+  cudaOccupancyMaxPotentialBlockSize(&min_grid, &block_size, MyKernel, 0, NXPROB*NYPROB);
+  grid = (NXPROB*NYPROB + block_size - 1) / block_size;
   dim3 dimBlocks(BLOCK_H, BLOCK_V);
   dim3 dimThreads((NXPROB / BLOCK_H) + ((NXPROB % BLOCK_H) != 0), (NYPROB / BLOCK_V) + ((NYPROB % BLOCK_V) != 0));
 
@@ -147,16 +137,19 @@ int main (int argc, char *argv[])
   cudaMemcpy(cuda_u1, u, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyHostToDevice);
 
   cudaEventRecord(start, 0);
-  for (i = 0; i < STEPS; i++)
-    if (i%2 == 0)  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u0, cuda_u1, parms);}
-    else  {cuda_update<<<dimBlocks, dimThreads>>>(cuda_u1, cuda_u0, parms);}
+  for (i = 0; i < STEPS; i+=2)
+  { 
+      cuda_update<<<grid, block_size>>>(cuda_u0, cuda_u1, parms);
+      cuda_update<<<grid, block_size>>>(cuda_u1, cuda_u0, parms);
+  }
+  cudaThreadSynchronize();
   cudaEventRecord(stop, 0);
-  //copy from device to host
-  if (STEPS%2 == 0) {cudaMemcpy(u, cuda_u0, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
-  else {cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);}
   cudaEventSynchronize(stop);
-  //prtdat(NXPROB, NYPROB, u, "final.dat");   //print
   cudaEventElapsedTime(&ms, start, stop);
+
+  //copy from device to host
+  cudaMemcpy(u, cuda_u1, (NXPROB*NYPROB*sizeof(float)), cudaMemcpyDeviceToHost);
+  //prtdat(NXPROB, NYPROB, u, "final.dat");   //print
   printf("Time: %f ms\n", ms);
   
   cudaFree(cuda_u0);
