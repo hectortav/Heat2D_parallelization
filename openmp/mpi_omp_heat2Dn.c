@@ -18,7 +18,7 @@
 #define MASTER      0                  /* taskid of first process */
 
 //omp
-//#define THREADS _IO_NO_READS//OMP_NUM_THREADS 
+#define THREADS	8 
 
 //New Params
 #define LTAG        2                  /* message tag */
@@ -225,7 +225,7 @@ int BLOCK, checkboard;
       start_time=MPI_Wtime();
       // parallel
       if (comm_cart != MPI_COMM_NULL)
-      #pragma omp parallel //num_threads(THREADS) private(it)
+      #pragma omp parallel num_threads(THREADS) private(it)
       {
       for (it = 1; it <= STEPS; it++)
       {
