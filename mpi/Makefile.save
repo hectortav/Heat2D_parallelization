@@ -1,6 +1,0 @@
- mpicc -o mpi_heat2Dn mpi_heat2Dn.c -lm
-dropbox_server: dropbox_server.c functions.c
-	gcc -pthread -o dropbox_server dropbox_server.c functions.c
-
-clean:
-	rm -rf *.o
